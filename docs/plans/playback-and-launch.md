@@ -6,12 +6,12 @@ The proposed webOS app ID is `software.oddorbit.voxfolio`. The display name is *
 
 | Action | Expected behaviour |
 | --- | --- |
-| Open the app tile | Show setup on first use, then Continue Listening or the library. |
+| Open the app tile | In the MVP, offer server setup and a ready state for incoming title launches. In the complete app, show Continue Listening and library browsing. |
 | Open a title by ID | Start a playback session for that book and resume at the server's current position. A new book starts at the beginning. |
 | Open a title before signing in | Carry the requested ID through setup and then open it. |
 | Request the currently playing book again | Bring its player forward and preserve the position and play/pause state. |
 | Request a different book while playing | Resolve the requested book, save and close the previous session, then switch audio. A repeated request must not start a second audio stream. |
-| Open an unavailable book | Explain that the title could not be opened and offer a return to the library. Offer Retry for connection failures. |
+| Open an unavailable book | Explain that the title could not be opened and return to the app's start screen. Offer Retry for connection failures. |
 
 ## Optional launcher integration
 

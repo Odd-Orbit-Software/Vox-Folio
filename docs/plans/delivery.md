@@ -1,24 +1,23 @@
 # Homebrew delivery plan
 
-## 1. Open and resume one real book
+## MVP acceptance on the rooted TV
 
-Build an IPK with the proposed app ID and install it on the rooted TV. Record the TV firmware, webOS version and Audiobookshelf server version used for the test. Polaris targets Chromium 79 on this setup, so check the packaged app against that engine early. Connect one listener account and implement the title launch and player before expanding the library screen.
+Package Vox Folio as an IPK and connect it to the same Audiobookshelf account as Absorb on the phone. Record the TV firmware, webOS version and server version alongside the results. Use one M4B with embedded chapters and one book split across files. These checks are pending until exercised on hardware.
 
-**On-TV check.** Start a book on a phone and pause mid-chapter. Launch Vox Folio with its item ID, listen past a recognisable sentence, pause, and reopen the book on the phone. It should resume at the sentence reached on the TV. Repeat the TV launch while Vox Folio is already open.
+- [ ] **Phone → TV → phone.** Pause mid-chapter on the phone. Launch that title on the TV, confirm the opening passage, listen past a recognisable sentence and pause. Reopen it on the phone and confirm it resumes at the new passage. Repeat across a file boundary and at a speed above 1×.
+- [ ] **External title launch.** Send the [documented item ID](playback-and-launch.md) from outside the app. Test a cold start, an already open player and a different book playing. Advance the book on the phone after preparing the launch request and check that Vox Folio uses the newer position. A first-time launch should retain the requested title through sign-in.
+- [ ] **Remote playback controls.** Play, pause, skip in both directions, seek to a later position, change chapters and select a playback speed. Check that skipping chapters works inside the single M4B and that audio continues across files in the multi-file book. Pausing should save the position and stop adding listening time.
 
-## 2. Make the standalone app usable
+During development, check the packaged app against the target TV's browser engine. Polaris targets Chromium 79 on this setup. Try an unknown item ID followed by a valid request. Interrupt the network during playback, advance the book on the phone, then reconnect the TV and check that the phone's newer position survives.
 
-Add Continue Listening, library selection and a remote-navigable player. Test play/pause, short seeks, chapter changes and Back. Keep focus visible when moving between the book list and the player. Make connection failures recoverable from the TV.
+Polaris can exercise the external launch contract through its Continue card once its audiobook target is updated in that project's repository. The same request can be issued independently to test Vox Folio.
 
-**On-TV checks**
+## Complete app acceptance on the rooted TV
 
-- Open the app tile with a fresh installation, connect to the server, choose a book and play it. Repeat with an account that has no listening history.
-- Skip an embedded chapter in a single M4B. With a multi-file book, seek across a file boundary, exit and resume on the other side.
-- Pause for a minute and check the server's listening history. Test a network interruption during playback and a newer position saved from the phone.
-- Open the player with an unknown item ID, then choose a valid book. Request a different book during playback and check that only the selected book is audible.
+Run the MVP checks again, then verify the complete listening experience.
 
-## 3. Connect the card and package the first release
-
-Test the public launch payload independently first. Then update the audiobook card target in the separate Polaris project and select an actual Continue card using the remote. Advance the book from the phone after the card renders and verify that the TV picks up that newer position. Open Vox Folio from its own tile again as a final standalone check.
-
-Package the tested IPK with its version, installation steps and the TV/server versions used. Test an upgrade over the previous development build to check that setup and server-side progress survive. LG Apps distribution is a possible later milestone.
+- [ ] From the app tile, open a library, browse titles, open title details and start playback. Check the home screen with and without in-progress books.
+- [ ] Browse to a series, open a title, then use the series name on that title to reach the ordered series list. Use Back to return to the same title with focus restored.
+- [ ] Verify the next title shown for books 2, 2.5 and 3 in a sample series. With autoplay enabled, finish book 2 and confirm the displayed successor starts and book 2 is marked complete on the phone. With autoplay disabled, confirm the successor remains visible for manual selection. At the final book or a standalone title, playback ends cleanly.
+- [ ] Leave a book playing until the in-app screensaver appears. Verify the entire cover and text move within the screen edges, the percentage advances and audio continues. Wake the player with the remote and confirm the first wake press preserves the play state. Repeat across an autoplay transition and verify the cover and progress switch to the new book.
+- [ ] Install the release IPK over the MVP and check that the server connection and listening progress survive. Record the tested TV and server versions with the installation steps.
