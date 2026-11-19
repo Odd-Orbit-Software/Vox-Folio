@@ -2,6 +2,8 @@
 
 Vox Folio is an audiobook player for LG webOS TVs from Odd Orbit Software Group. The first release will be a homebrew app for the group's rooted TV, packaged as an installable IPK. Vox Folio owns its player, server connection, settings and release cycle. It connects directly to Audiobookshelf.
 
+Odd Orbit uses the domains `oddorbit.software` and `oddorbitsoftware.com`. Vox Folio's proposed app ID uses the reverse of `oddorbit.software` as its namespace.
+
 ## Listening on the TV
 
 Opening Vox Folio from the TV's app list shows **Continue Listening** and a way to choose a book from the library. On first use, the listener connects their Audiobookshelf server and signs in. A listener with no books in progress lands on the library.

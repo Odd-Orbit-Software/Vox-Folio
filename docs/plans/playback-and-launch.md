@@ -1,6 +1,6 @@
 # Playback and title launches
 
-Proposed webOS app ID: `ie.oddorbit.voxfolio`. The display name is **Vox Folio**.
+The proposed webOS app ID is `software.oddorbit.voxfolio`. The display name is **Vox Folio**.
 
 ## Entry points
 
@@ -19,7 +19,7 @@ Use the existing Polaris audiobook card payload for the first integration. This 
 
 ```json
 {
-  "id": "ie.oddorbit.voxfolio",
+  "id": "software.oddorbit.voxfolio",
   "params": { "abs": "example-library-item-id" }
 }
 ```
