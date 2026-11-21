@@ -28,3 +28,5 @@ Absorb on Android is the feature reference for browsing and listening. Vox Folio
 The first installation targets one server and one listening account. The proposed meaning of “next” is the next title available in that library's series order. LG Apps distribution can be considered after the homebrew release.
 
 The [playback and launch plan](playback-and-launch.md) defines how the player opens a title. The [delivery plan](delivery.md) sets out what to verify on the TV.
+
+The [roadmap](roadmap.md) lists the features planned after the homebrew app.
