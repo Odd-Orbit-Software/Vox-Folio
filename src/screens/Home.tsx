@@ -2,7 +2,9 @@ import {useEffect, useState} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
 import type {LibraryItem, MediaProgress} from '../abs/types';
+import type {Route} from '../app/routes';
 import {Button, Cover, Icon, Tile} from '../components/controls';
+import {Rail} from '../components/Rail';
 import {ScreenContainer} from '../components/ScreenContainer';
 import type {PlayerState} from '../player/engine';
 import {formatDuration} from '../player/timeline';
@@ -10,8 +12,12 @@ import {formatDuration} from '../player/timeline';
 interface HomeProps {
 	client: AbsClient;
 	player: PlayerState;
-	onOpen: (itemId: string) => void;
-	onShowPlayer: () => void;
+	restoreKey: string | null;
+	/** Play (or bring forward) a book; `fromKey` is the item to refocus on return. */
+	onPlay: (itemId: string, fromKey: string) => void;
+	onDetails: (itemId: string, fromKey: string) => void;
+	onShowPlayer: (fromKey: string) => void;
+	onTab: (name: Route['name']) => void;
 	onAbout: () => void;
 }
 
@@ -21,9 +27,6 @@ interface Entry {
 }
 
 type Load = {state: 'loading'} | {state: 'error'; error: AbsError} | {state: 'ready'; entries: Entry[]};
-
-// Back returns here with focus on the book you left.
-let lastFocusKey: string | null = null;
 
 function remaining (e: Entry): string {
 	const duration = e.item.media.duration || (e.progress ? e.progress.duration : 0);
@@ -35,7 +38,7 @@ function percent (e: Entry): number {
 	return e.progress ? Math.round(e.progress.progress * 100) : 0;
 }
 
-export default function Home ({client, player, onOpen, onShowPlayer, onAbout}: HomeProps) {
+export default function Home ({client, player, restoreKey, onPlay, onDetails, onShowPlayer, onTab, onAbout}: HomeProps) {
 	const [load, setLoad] = useState<Load>({state: 'loading'});
 
 	const [reload, setReload] = useState(0);
@@ -62,27 +65,19 @@ export default function Home ({client, player, onOpen, onShowPlayer, onAbout}: H
 	const rest = entries.slice(1, 7);
 	const nowPlaying = player.itemId && player.status !== 'error' ? player : null;
 
-	// Remember what was selected (not merely focused), so Back lands on the item you opened.
-	const select = (key: string, action: () => void) => () => {
-		lastFocusKey = key;
-		action();
-	};
-
 	return (
-		<ScreenContainer id="home" className="vf-home" restoreKey={lastFocusKey} focusDeps={[load.state]}>
+		<ScreenContainer id="home" className="vf-home vf-browse" restoreKey={restoreKey} focusDeps={[load.state]}>
+			<Rail active="home" onTab={onTab} onAbout={onAbout} />
 			<header className="vf-topbar">
-				<div className="vf-wordmark">Vox Folio</div>
+				<h1 className="vf-browse__h1">Home</h1>
 				<div className="vf-topbar__actions">
 					{nowPlaying && (
-						<Button variant="chip" className="vf-nowplaying" onClick={select('now-playing', onShowPlayer)} data-focus-key="now-playing">
+						<Button variant="chip" className="vf-nowplaying" onClick={() => onShowPlayer('now-playing')} data-focus-key="now-playing">
 							<Icon name={nowPlaying.status === 'playing' ? 'pause' : 'play'} size={18} />
 							<span className="vf-nowplaying__title">{nowPlaying.title || 'Loading…'}</span>
 							{nowPlaying.duration > 0 && <span className="vf-muted vf-nowplaying__pct">{'· ' + Math.round(nowPlaying.position / nowPlaying.duration * 100) + '%'}</span>}
 						</Button>
 					)}
-					<Button variant="icon" aria-label="About Vox Folio" onClick={select('about', onAbout)} data-focus-key="about">
-						<Icon name="info" size={30} />
-					</Button>
 				</div>
 			</header>
 
@@ -113,7 +108,7 @@ export default function Home ({client, player, onOpen, onShowPlayer, onAbout}: H
 					<p className="vf-message__body">Start a book on your phone, or open one from the Polaris home screen, and it will show up here.</p>
 					{nowPlaying && (
 						<div className="vf-row">
-							<Button variant="primary" data-default-focus onClick={onShowPlayer}>Back to the player</Button>
+							<Button variant="primary" data-default-focus onClick={() => onShowPlayer('now-playing')}>Back to the player</Button>
 						</div>
 					)}
 				</div>
@@ -139,11 +134,12 @@ export default function Home ({client, player, onOpen, onShowPlayer, onAbout}: H
 								variant="primary"
 								data-default-focus
 								data-focus-key={'hero:' + hero.item.id}
-								onClick={select('hero:' + hero.item.id, () => onOpen(hero.item.id))}
+								onClick={() => onPlay(hero.item.id, 'hero:' + hero.item.id)}
 							>
 								<Icon name="play" size={26} />
 								{player.itemId === hero.item.id ? 'Back to player' : 'Resume'}
 							</Button>
+							<Button data-focus-key={'details:' + hero.item.id} onClick={() => onDetails(hero.item.id, 'details:' + hero.item.id)}>Details</Button>
 						</div>
 					</div>
 				</section>
@@ -158,7 +154,7 @@ export default function Home ({client, player, onOpen, onShowPlayer, onAbout}: H
 								key={e.item.id}
 								className="vf-book"
 								data-focus-key={'book:' + e.item.id}
-								onClick={select('book:' + e.item.id, () => onOpen(e.item.id))}
+								onClick={() => onPlay(e.item.id, 'book:' + e.item.id)}
 								aria-label={e.item.media.metadata.title + ', ' + remaining(e)}
 							>
 								<Cover url={client.coverUrl(e.item.id, 480)} title={e.item.media.metadata.title} author={e.item.media.metadata.authorName} size={240} />

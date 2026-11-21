@@ -42,9 +42,33 @@ export interface BookMetadata {
 	subtitle?: string | null;
 	authorName?: string;
 	narratorName?: string;
+	/** "Series #seq", comma-separated when a book is in several series (minified listings). */
 	seriesName?: string;
+	publishedYear?: string | null;
+	genres?: string[];
 	series?: SeriesRef[];
 	description?: string | null;
+}
+
+export interface Library {
+	id: string;
+	name: string;
+	mediaType: 'book' | 'podcast';
+	displayOrder?: number;
+}
+
+export interface Series {
+	id: string;
+	name: string;
+	/** Present in library series listings, in series order. */
+	books?: LibraryItem[];
+}
+
+export interface Page<T> {
+	results: T[];
+	total: number;
+	limit: number;
+	page: number;
 }
 
 export interface LibraryItem {
@@ -53,6 +77,7 @@ export interface LibraryItem {
 	mediaType: 'book' | 'podcast';
 	isMissing?: boolean;
 	isInvalid?: boolean;
+	addedAt?: number;
 	updatedAt?: number;
 	media: {
 		coverPath?: string | null;

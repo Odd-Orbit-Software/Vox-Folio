@@ -57,3 +57,23 @@ export function loadPlaybackRate (): number {
 export function savePlaybackRate (rate: number): void {
 	write(SPEED_KEY, String(rate));
 }
+
+const LIBRARY_KEY = 'voxfolio.libraryId';
+const AUTOPLAY_KEY = 'voxfolio.seriesAutoplay';
+
+export function loadLibraryId (): string | null {
+	return read(LIBRARY_KEY);
+}
+
+export function saveLibraryId (id: string): void {
+	write(LIBRARY_KEY, id);
+}
+
+/** Series autoplay: on unless the listener turned it off. */
+export function loadAutoplay (): boolean {
+	return read(AUTOPLAY_KEY) !== 'off';
+}
+
+export function saveAutoplay (on: boolean): void {
+	write(AUTOPLAY_KEY, on ? 'on' : 'off');
+}

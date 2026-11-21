@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {LibraryItem, LoginResponse, MediaProgress, PlaybackSession, SyncPayload} from './types';
+import type {Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Series, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -194,6 +194,49 @@ export class AbsClient {
 	async itemsInProgress (limit = 12): Promise<LibraryItem[]> {
 		const data = await this.request<{libraryItems: LibraryItem[]}>('GET', '/api/me/items-in-progress?limit=' + limit);
 		return (data && data.libraryItems || []).filter((i) => i.mediaType === 'book');
+	}
+
+	async libraries (): Promise<Library[]> {
+		const data = await this.request<{libraries: Library[]}>('GET', '/api/libraries');
+		return (data && data.libraries || [])
+			.filter((l) => l.mediaType === 'book')
+			.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+	}
+
+	/** One page of a library's books. `sort` is an Audiobookshelf sort key such as media.metadata.title. */
+	libraryItems (libraryId: string, opts: {sort: string; desc?: boolean; page: number; limit: number; filter?: string}): Promise<Page<LibraryItem>> {
+		const q = [
+			'limit=' + opts.limit,
+			'page=' + opts.page,
+			'sort=' + encodeURIComponent(opts.sort),
+			'desc=' + (opts.desc ? 1 : 0),
+			'minified=1'
+		];
+		if (opts.filter) q.push('filter=' + encodeURIComponent(opts.filter));
+		return this.request<Page<LibraryItem>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/items?' + q.join('&'));
+	}
+
+	/** A library's series, by name. Each includes its books in series order. */
+	librarySeries (libraryId: string, page: number, limit: number): Promise<Page<Series>> {
+		return this.request<Page<Series>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/series?sort=name&page=' + page + '&limit=' + limit);
+	}
+
+	getSeries (seriesId: string): Promise<Series> {
+		return this.request<Series>('GET', '/api/series/' + encodeURIComponent(seriesId), undefined, 'That series');
+	}
+
+	/** A series' books with full metadata, so each carries its structured {id, name, sequence}. */
+	async seriesBooks (libraryId: string, seriesId: string): Promise<LibraryItem[]> {
+		// Audiobookshelf filters take base64-encoded values.
+		const filter = 'series.' + window.btoa(seriesId);
+		const q = 'filter=' + encodeURIComponent(filter) + '&sort=' + encodeURIComponent('media.metadata.series.sequence') + '&limit=500&minified=0';
+		const page = await this.request<Page<LibraryItem>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/items?' + q);
+		return page && page.results || [];
+	}
+
+	/** Mark a book finished (or not) for this listener. */
+	setFinished (itemId: string, isFinished: boolean): Promise<void> {
+		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId), {isFinished});
 	}
 
 	startPlayback (itemId: string, device: DeviceInfo, supportedMimeTypes: string[]): Promise<PlaybackSession> {

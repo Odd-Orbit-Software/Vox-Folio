@@ -3,7 +3,10 @@ import type {KeyboardEvent as ReactKeyboardEvent} from 'react';
 
 import {Clock} from '../components/Clock';
 import {Button, Cover, Icon, Tile} from '../components/controls';
-import {focusWithin, PanelScope, ScreenContainer} from '../components/ScreenContainer';
+import {focusWithin, PanelScope, pinScroll, ScreenContainer} from '../components/ScreenContainer';
+import type {Chapter} from '../abs/types';
+import {bookLabel} from '../app/series';
+import type {SeriesEntry} from '../app/series';
 import type {PlayerEngine, PlayerState} from '../player/engine';
 import {
 	chapterIndexAt, clamp, formatClock, formatDuration, formatRate, RATE_PRESETS, seekStepForRepeat, stepRate
@@ -13,8 +16,77 @@ import {isBackKey, Keys} from '../platform/webos';
 interface PlayerProps {
 	engine: PlayerEngine;
 	player: PlayerState;
+	autoplay: boolean;
+	/** The next book in the series when autoplay will play it, else null. */
+	next: SeriesEntry | null;
+	nextCoverUrl: string;
+	onToggleAutoplay: () => void;
+	onPlayNext: () => void;
+	onDeclineNext: () => void;
 	onHome: () => void;
 	onRetry: () => void;
+}
+
+type Panel = 'none' | 'speed' | 'chapters';
+
+/** Show Up Next this many seconds (real time, at the current speed) before the end. */
+const UP_NEXT_SECONDS = 15;
+/** Chapter rows are 82 px with a 6 px gap; must match .vf-chapter. */
+const CHAPTER_PITCH = 88;
+
+function ChaptersPanel ({chapters, current, onPick}: {chapters: Chapter[]; current: number; onPick: (c: Chapter) => void}) {
+	const [focusRow, setFocusRow] = useState(Math.max(0, current));
+	return (
+		<>
+			<div className="vf-scrim" />
+			<PanelScope id="chapters-panel" className="vf-panel">
+				<div className="vf-panel__head">
+					<h2 className="vf-panel__title">Chapters</h2>
+					<span className="vf-muted">{chapters.length + ' · Back to close'}</span>
+				</div>
+				<div className="vf-chapters" onScroll={pinScroll}>
+					<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, focusRow - 4) * CHAPTER_PITCH + 'px)'}}>
+						{chapters.map((c, i) => (
+							<li key={c.id + ':' + i}>
+								<Tile
+									className={'vf-chapter' + (i === current ? ' is-current' : '') + (i < current ? ' is-played' : '')}
+									data-default-focus={i === Math.max(0, current) || undefined}
+									onFocus={() => setFocusRow(i)}
+									onClick={() => onPick(c)}
+								>
+									<span className="vf-chapter__num">{i + 1}</span>
+									<span className="vf-chapter__title">{c.title}</span>
+									<span className="vf-chapter__meta">{i === current ? 'Playing' : formatClock(c.end - c.start)}</span>
+								</Tile>
+							</li>
+						))}
+					</ol>
+				</div>
+			</PanelScope>
+		</>
+	);
+}
+
+function UpNextCard ({next, coverUrl, seconds, onPlay, onDecline}: {next: SeriesEntry; coverUrl: string; seconds: number; onPlay: () => void; onDecline: () => void}) {
+	const md = next.item.media.metadata;
+	return (
+		<>
+			<div className="vf-scrim vf-scrim--light" />
+			<PanelScope id="up-next" className="vf-upnext">
+				<Cover url={coverUrl} title={md.title} author={md.authorName} size={260} className="vf-upnext__cover" />
+				<div className="vf-upnext__body">
+					<div className="vf-eyebrow vf-eyebrow--brass">{'Up next' + (next.sequence ? ' · ' + bookLabel(next.sequence) : '')}</div>
+					<div className="vf-upnext__title">{md.title}</div>
+					<div className="vf-upnext__meta">{'Starts in ' + seconds + 's · this book will be marked finished'}</div>
+					<div className="vf-bar vf-upnext__bar"><div className="vf-bar__fill vf-upnext__fill" style={{width: Math.max(0, 100 - seconds / UP_NEXT_SECONDS * 100) + '%'}} /></div>
+					<div className="vf-row vf-row--spaced">
+						<Button variant="primary" data-default-focus onClick={onPlay}>Play now</Button>
+						<Button onClick={onDecline}>Not now</Button>
+					</div>
+				</div>
+			</PanelScope>
+		</>
+	);
 }
 
 function syncLabel (p: PlayerState, now: number): string {
@@ -68,8 +140,11 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, onHome, onRetry}: PlayerProps) {
-	const [speedOpen, setSpeedOpen] = useState(false);
+export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry}: PlayerProps) {
+	const [panel, setPanel] = useState<Panel>('none');
+	const speedOpen = panel === 'speed';
+	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
+	const showUpNext = Boolean(next) && player.status === 'playing' && remainingReal <= UP_NEXT_SECONDS && panel === 'none';
 	const [preview, setPreview] = useState<number | null>(null);
 	const repeat = useRef({dir: 0, count: 0, at: 0});
 	const now = useNow(5000);
@@ -79,11 +154,14 @@ export default function Player ({engine, player, onHome, onRetry}: PlayerProps) 
 		const onKeyDown = (ev: KeyboardEvent) => {
 			const code = ev.keyCode;
 			let handled = true;
-			if (isBackKey(code) && speedOpen) setSpeedOpen(false);
+			if (isBackKey(code) && panel !== 'none') setPanel('none');
+			else if (isBackKey(code) && showUpNext) onDeclineNext();
 			else if (isBackKey(code) && preview !== null) setPreview(null);
-			else if (code === Keys.GREEN) setSpeedOpen((o) => !o);
-			else if (code === Keys.CH_UP && !speedOpen) engine.nextChapter();
-			else if (code === Keys.CH_DOWN && !speedOpen) engine.previousChapter();
+			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
+			else if (code === Keys.RED && player.chapters.length) setPanel((o) => (o === 'chapters' ? 'none' : 'chapters'));
+			else if (code === Keys.BLUE) onToggleAutoplay();
+			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
+			else if (code === Keys.CH_DOWN && panel === 'none') engine.previousChapter();
 			else handled = false;
 			if (handled) {
 				ev.preventDefault();
@@ -92,14 +170,21 @@ export default function Player ({engine, player, onHome, onRetry}: PlayerProps) 
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [engine, speedOpen, preview]);
+	}, [engine, panel, preview, showUpNext, player.chapters.length, onDeclineNext, onToggleAutoplay]);
 
-	// When the speed panel closes, put focus back on its button.
-	const wasOpen = useRef(false);
+	// When a panel closes, put focus back on the button that opened it.
+	const wasOpen = useRef<Panel>('none');
 	useEffect(() => {
-		if (wasOpen.current && !speedOpen) focusWithin('player', 'speed');
-		wasOpen.current = speedOpen;
-	}, [speedOpen]);
+		if (wasOpen.current !== 'none' && panel === 'none') focusWithin('player', wasOpen.current);
+		wasOpen.current = panel;
+	}, [panel]);
+
+	// When Up Next goes away (declined, or the next book started), return focus to the controls.
+	const upNextWas = useRef(false);
+	useEffect(() => {
+		if (upNextWas.current && !showUpNext) focusWithin('player', 'play');
+		upNextWas.current = showUpNext;
+	}, [showUpNext]);
 
 	const ticks = useMemo(() => {
 		if (!player.duration) return [];
@@ -156,13 +241,20 @@ export default function Player ({engine, player, onHome, onRetry}: PlayerProps) 
 	const loading = p.status === 'loading' && !p.title;
 
 	return (
-		<ScreenContainer key="player" id="player" className={'vf-player' + (speedOpen ? ' has-panel' : '')}>
+		<ScreenContainer key="player" id="player" className={'vf-player' + (panel !== 'none' ? ' has-panel' : '')}>
 			<div className="vf-player__top">
 				<span className="vf-hint"><Icon name="chevronDown" size={24} />Back to browsing</span>
 				<Clock className="vf-player__time" />
-				<span className="vf-hint">
-					{p.sync === 'synced' ? <Icon name="cloud" size={24} /> : <Icon name="cloudOff" size={24} />}
-					{syncLabel(p, now)}
+				<span className="vf-player__status">
+					{p.series && (
+						<span className={'vf-hint vf-player__autoplay' + (autoplay ? ' is-on' : '')}>
+							<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
+						</span>
+					)}
+					<span className="vf-hint">
+						{p.sync === 'synced' ? <Icon name="cloud" size={24} /> : <Icon name="cloudOff" size={24} />}
+						{syncLabel(p, now)}
+					</span>
 				</span>
 			</div>
 
@@ -233,14 +325,32 @@ export default function Player ({engine, player, onHome, onRetry}: PlayerProps) 
 						<Button variant="icon" className="vf-round" aria-label="Next chapter" disabled={!p.chapters.length} onClick={() => engine.nextChapter()}><Icon name="nextChapter" size={34} /></Button>
 					</div>
 					<div className="vf-transport__side vf-transport__side--end">
-						<Button variant="chip" data-focus-key="speed" onClick={() => setSpeedOpen(true)}>
+						<Button variant="chip" data-focus-key="speed" onClick={() => setPanel('speed')}>
 							<span className="vf-dot vf-dot--green" />{formatRate(p.rate)}
 						</Button>
+						{p.chapters.length > 0 && (
+							<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel('chapters')}>
+								<span className="vf-dot vf-dot--red" />Chapters
+							</Button>
+						)}
 					</div>
 				</div>
 			</div>
 
 			{speedOpen && <SpeedPanel rate={p.rate} onRate={(r) => engine.setRate(r)} />}
+			{panel === 'chapters' && (
+				<ChaptersPanel
+					chapters={p.chapters}
+					current={p.chapterIndex}
+					onPick={(c) => {
+						engine.seek(c.start);
+						setPanel('none');
+					}}
+				/>
+			)}
+			{showUpNext && next && (
+				<UpNextCard next={next} coverUrl={nextCoverUrl} seconds={Math.ceil(remainingReal)} onPlay={onPlayNext} onDecline={onDeclineNext} />
+			)}
 		</ScreenContainer>
 	);
 }

@@ -5,9 +5,13 @@ import {useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExtern
 import appinfo from '../../webos-meta/appinfo.json';
 import {AbsClient, login, normaliseServerUrl} from '../abs/client';
 import type {Credentials} from '../abs/client';
-import {deviceId, loadCredentials, saveCredentials} from '../abs/store';
+import {deviceId, loadAutoplay, loadCredentials, saveAutoplay, saveCredentials} from '../abs/store';
 import {IdleWatcher} from '../app/idle';
 import {decideLaunch} from '../app/launch';
+import {pop, push, reset} from '../app/routes';
+import type {Entry, Route} from '../app/routes';
+import {nextInSeries} from '../app/series';
+import type {SeriesEntry} from '../app/series';
 import {Screensaver} from '../components/Screensaver';
 import {Toasts} from '../components/Toasts';
 import type {Toast} from '../components/Toasts';
@@ -17,11 +21,13 @@ import type {PlayerState} from '../player/engine';
 import {controlTvScreensaver} from '../platform/screensaver';
 import {activate, exitApp, isBackKey, Keys, onRelaunch, readLaunchParams, requestedItemId} from '../platform/webos';
 import About from '../screens/About';
+import Details from '../screens/Details';
 import Home from '../screens/Home';
+import Library from '../screens/Library';
 import Player from '../screens/Player';
+import SeriesDetail from '../screens/SeriesDetail';
+import SeriesList from '../screens/SeriesList';
 import Setup from '../screens/Setup';
-
-export type Screen = 'setup' | 'home' | 'player' | 'about';
 
 /* One <audio> element for the app's lifetime. It must be in the document: on webOS a detached media
    element decodes and reports progress but its sound never reaches the TV's speakers. */
@@ -76,15 +82,24 @@ function makeSession (creds: Credentials): Session {
 	return {creds, client, engine: new PlayerEngine(client, audio, device)};
 }
 
+interface UpNext {
+	forItemId: string;
+	next: SeriesEntry | null;
+}
+
 function App () {
 	const [session, setSession] = useState<Session | null>(() => {
 		const saved = loadCredentials();
 		return saved ? makeSession(saved) : null;
 	});
-	const [screen, setScreen] = useState<Screen>(() => (session ? 'home' : 'setup'));
+	const [stack, setStack] = useState<Entry[]>(() => reset(session ? {name: 'home'} : {name: 'setup'}));
 	const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 	const [authMessage, setAuthMessage] = useState('');
 	const [toasts, setToasts] = useState<Toast[]>([]);
+	const [autoplay, setAutoplay] = useState(loadAutoplay);
+	const [upNext, setUpNext] = useState<UpNext | null>(null);
+	// Books whose Up Next the listener turned down ("Not now"), so autoplay skips them.
+	const [declined, setDeclined] = useState<string[]>([]);
 	const toastId = useRef(0);
 
 	const client = session ? session.client : null;
@@ -92,6 +107,8 @@ function App () {
 	const creds = session ? session.creds : null;
 	const player = usePlayer(engine);
 	const asleep = useSyncExternalStore(subscribeIdle, getIdle);
+	const top = stack[stack.length - 1];
+	const route = top.route;
 
 	// The engine shares the one <audio> element; detach the old one when the account changes.
 	useEffect(() => () => {
@@ -99,9 +116,9 @@ function App () {
 	}, [engine]);
 
 	// Latest values for event handlers that are registered once.
-	const live = useRef<{session: Session | null; screen: Screen}>({session, screen});
+	const live = useRef({session, route, stackDepth: stack.length, autoplay, upNext, declined});
 	useLayoutEffect(() => {
-		live.current = {session, screen};
+		live.current = {session, route, stackDepth: stack.length, autoplay, upNext, declined};
 	});
 
 	const pushToast = useCallback((text: string) => {
@@ -111,25 +128,31 @@ function App () {
 		window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
 	}, []);
 
+	const go = useCallback((next: Route, fromKey?: string | null) => setStack((st) => push(st, next, fromKey)), []);
+
+	const showPlayer = useCallback((fromKey?: string | null) => {
+		setStack((st) => (st[st.length - 1].route.name === 'player' ? st : push(st, {name: 'player'}, fromKey)));
+	}, []);
+
 	const signOut = useCallback((message = '') => {
 		const current = live.current.session;
 		if (current) current.engine.close();
 		saveCredentials(null);
 		setSession(null);
 		setAuthMessage(message);
-		setScreen('setup');
+		setStack(reset({name: 'setup'}));
 	}, []);
 
-	const openBook = useCallback((target: PlayerEngine, itemId: string) => {
+	const openBook = useCallback((target: PlayerEngine, itemId: string, opts: {fromKey?: string | null; startAt?: number} = {}) => {
 		const previous = target.getState();
 		if (previous.itemId && previous.itemId !== itemId && previous.title) {
 			pushToast('Saved your place in ' + previous.title);
 		}
-		setScreen('player');
-		target.open(itemId);
-	}, [pushToast]);
+		showPlayer(opts.fromKey);
+		target.open(itemId, true, opts.startAt);
+	}, [pushToast, showPlayer]);
 
-	/** Every title request, cold or warm, comes through here. */
+	/** Every title request from outside (Polaris, a relaunch) comes through here. */
 	const handleRequest = useCallback((itemId: string | null) => {
 		const current = live.current.session;
 		const action = decideLaunch(itemId, {
@@ -139,30 +162,33 @@ function App () {
 		switch (action.type) {
 			case 'defer':
 				setPendingItemId(action.itemId);
-				setScreen('setup');
+				setStack(reset({name: 'setup'}));
 				break;
 			case 'showPlayer':
-				setScreen('player');
+				showPlayer();
 				if (current) current.engine.catchUp();
 				break;
 			case 'open':
-				if (current) openBook(current.engine, action.itemId);
+				if (current) {
+					// Back from a launched book goes Home, whatever was open before.
+					setStack(push(reset({name: 'home'}), {name: 'player'}));
+					openBook(current.engine, action.itemId);
+				}
 				break;
 			default:
 				break;
 		}
-	}, [openBook]);
+	}, [openBook, showPlayer]);
 
 	const onSignedIn = useCallback((c: Credentials) => {
 		saveCredentials(c);
 		const next = makeSession(c);
 		setSession(next);
 		setAuthMessage('');
+		setStack(reset({name: 'home'}));
 		if (pendingItemId) {
 			setPendingItemId(null);
 			openBook(next.engine, pendingItemId);
-		} else {
-			setScreen('home');
 		}
 	}, [pendingItemId, openBook]);
 	const onSignedInRef = useRef(onSignedIn);
@@ -194,7 +220,32 @@ function App () {
 		});
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// Engine notices become toasts; an expired sign-in goes back to setup, keeping the book.
+	// What comes next in the series for the book that's loaded (the Up Next card and autoplay).
+	useEffect(() => {
+		const itemId = player.itemId;
+		const series = player.series;
+		const libraryId = player.libraryId;
+		if (!client || !itemId || !series || !libraryId) return undefined;
+		let cancelled = false;
+		client.seriesBooks(libraryId, series.id).then((books) => {
+			if (!cancelled) setUpNext({forItemId: itemId, next: nextInSeries(books, itemId, series.id, series.name)});
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, player.itemId, player.series, player.libraryId]);
+
+	const playNext = useCallback(() => {
+		const {session: current, upNext: un} = live.current;
+		if (!current || !un || !un.next) return;
+		const finishedId = un.forItemId;
+		current.client.setFinished(finishedId, true).catch(() => undefined);
+		pushToast('Up next: ' + un.next.item.media.metadata.title);
+		openBook(current.engine, un.next.item.id);
+	}, [openBook, pushToast]);
+
+	// Engine events: notices become toasts, the end of a book is saved as finished and (with autoplay)
+	// starts the next one, and an expired sign-in goes back to setup keeping the book.
 	useEffect(() => {
 		if (!engine) return undefined;
 		let lastNotice = 0;
@@ -202,8 +253,19 @@ function App () {
 		let lastStatus = '';
 		return engine.subscribe((s) => {
 			if (s.status !== lastStatus) {
+				const was = lastStatus;
 				lastStatus = s.status;
 				report({kind: 'audio', status: s.status, muted: audio.muted, volume: audio.volume, paused: audio.paused, readyState: audio.readyState, networkState: audio.networkState, rate: audio.playbackRate, inDocument: document.body.contains(audio), mediaError: audio.error ? audio.error.code : null, mediaId: (audio as unknown as {mediaId?: string}).mediaId || null});
+				if (s.status === 'ended' && was !== 'ended' && s.itemId) {
+					const {session: current, autoplay: on, upNext: un, declined: no} = live.current;
+					const hasNext = Boolean(un && un.forItemId === s.itemId && un.next);
+					if (on && hasNext && no.indexOf(s.itemId) === -1) {
+						playNext();
+					} else if (current) {
+						current.client.setFinished(s.itemId, true).catch(() => undefined);
+						pushToast('Finished ' + s.title);
+					}
+				}
 			}
 			if (s.syncError !== lastSyncError) {
 				lastSyncError = s.syncError;
@@ -218,7 +280,15 @@ function App () {
 				signOut('Your sign-in expired. Sign in again to keep listening.');
 			}
 		});
-	}, [engine, pushToast, signOut]);
+	}, [engine, pushToast, signOut, playNext]);
+
+	const toggleAutoplay = useCallback(() => {
+		setAutoplay((on) => {
+			saveAutoplay(!on);
+			pushToast(on ? 'Series autoplay off' : 'Series autoplay on');
+			return !on;
+		});
+	}, [pushToast]);
 
 	// Save the position when the TV hides the app (Home button, input switch, power off).
 	useEffect(() => {
@@ -251,14 +321,16 @@ function App () {
 	// Back and the remote's media keys. Screens handle their own panels and stop propagation first.
 	useEffect(() => {
 		const onKeyDown = (ev: KeyboardEvent) => {
-			const {session: current, screen: s} = live.current;
+			const {session: current, route: r, stackDepth} = live.current;
 			const e = current ? current.engine : null;
 			const code = ev.keyCode;
 			const loaded = Boolean(e && e.getState().itemId && e.getState().status !== 'error');
 			if (isBackKey(code)) {
 				ev.preventDefault();
-				if (s === 'player' || s === 'about') setScreen(current ? 'home' : 'setup');
-				else if (s === 'home' && loaded) setScreen('player');
+				if (r.name === 'setup') exitApp();
+				else if (stackDepth > 1) setStack(pop);
+				else if (r.name !== 'home') setStack(reset({name: 'home'}));
+				else if (loaded) setStack((st) => push(st, {name: 'player'}));
 				else exitApp();
 				return;
 			}
@@ -287,12 +359,17 @@ function App () {
 
 	useEffect(() => {
 		Spotlight.setPointerMode(false);
-	}, [screen]);
+	}, [route]);
 
+	const onTab = (name: Route['name']) => {
+		if (name === 'home' || name === 'library' || name === 'series') setStack(reset({name} as Route));
+	};
+	const onAbout = () => go({name: 'about'}, 'rail:about');
+	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
 
 	return (
 		<div className="vf-stage">
-			{screen === 'setup' && (
+			{route.name === 'setup' && (
 				<Setup
 					initialServer={creds ? creds.serverUrl : ''}
 					message={authMessage}
@@ -300,28 +377,87 @@ function App () {
 					onSignedIn={onSignedIn}
 				/>
 			)}
-			{screen === 'home' && client && (
+			{route.name === 'home' && client && engine && (
 				<Home
 					client={client}
 					player={player}
-					onOpen={handleRequest}
-					onShowPlayer={() => setScreen('player')}
-					onAbout={() => setScreen('about')}
+					restoreKey={top.focusKey}
+					onPlay={(itemId, fromKey) => {
+						if (player.itemId === itemId && player.status !== 'error') showPlayer(fromKey);
+						else openBook(engine, itemId, {fromKey});
+					}}
+					onDetails={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+					onShowPlayer={(fromKey) => showPlayer(fromKey)}
+					onTab={onTab}
+					onAbout={onAbout}
 				/>
 			)}
-			{screen === 'player' && engine && client && (
+			{route.name === 'library' && client && (
+				<Library
+					client={client}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onAbout={onAbout}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+				/>
+			)}
+			{route.name === 'series' && client && (
+				<SeriesList
+					client={client}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onAbout={onAbout}
+					onOpenSeries={(libraryId, series, fromKey) => go({name: 'seriesDetail', libraryId, seriesId: series.id, seriesName: series.name}, fromKey)}
+				/>
+			)}
+			{route.name === 'seriesDetail' && client && (
+				<SeriesDetail
+					key={route.seriesId}
+					client={client}
+					libraryId={route.libraryId}
+					seriesId={route.seriesId}
+					seriesName={route.seriesName}
+					focusItemId={route.focusItemId}
+					restoreKey={top.focusKey}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+				/>
+			)}
+			{route.name === 'details' && client && engine && (
+				<Details
+					key={route.itemId}
+					client={client}
+					itemId={route.itemId}
+					player={player}
+					autoplay={autoplay}
+					restoreKey={top.focusKey}
+					onToggleAutoplay={toggleAutoplay}
+					onPlay={(itemId, startAt) => openBook(engine, itemId, {fromKey: 'play', startAt})}
+					onShowPlayer={() => showPlayer('play')}
+					onOpenSeries={(libraryId, series, fromKey) => go({name: 'seriesDetail', libraryId, seriesId: series.id, seriesName: series.name, focusItemId: route.itemId}, fromKey)}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+				/>
+			)}
+			{route.name === 'player' && engine && client && (
 				<Player
 					engine={engine}
 					player={player}
-					onHome={() => setScreen('home')}
+					autoplay={autoplay}
+					next={nextForPlayer}
+					nextCoverUrl={nextForPlayer && nextForPlayer.item.media.coverPath ? client.coverUrl(nextForPlayer.item.id, 520) : ''}
+					onToggleAutoplay={toggleAutoplay}
+					onPlayNext={playNext}
+					onDeclineNext={() => {
+						if (player.itemId) setDeclined((d) => d.concat(player.itemId as string));
+					}}
+					onHome={() => setStack(reset({name: 'home'}))}
 					onRetry={() => player.itemId && openBook(engine, player.itemId)}
 				/>
 			)}
-			{screen === 'about' && (
+			{route.name === 'about' && (
 				<About
 					version={appinfo.version}
 					creds={creds}
-					onBack={() => setScreen(client ? 'home' : 'setup')}
+					onBack={() => setStack(pop)}
 					onSignOut={() => signOut('')}
 				/>
 			)}

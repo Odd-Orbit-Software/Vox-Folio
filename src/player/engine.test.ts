@@ -307,3 +307,12 @@ test('catching up leaves our position alone when the server has nothing newer', 
 	await engine.catchUp();
 	expect(engine.getState().position).toBe(100);
 });
+
+test('can start over from the beginning instead of the saved position', async () => {
+	const c = makeClient();
+	const audio = new FakeAudio();
+	const engine = new PlayerEngine(c.client, audio as unknown as HTMLAudioElement, device);
+	await engine.open('item-1', true, 0);
+	expect(engine.getState().position).toBe(0);
+	expect(audio.currentTime).toBe(0);
+});

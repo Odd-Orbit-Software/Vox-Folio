@@ -10,7 +10,7 @@
 
 import {AbsError} from '../abs/client';
 import type {AbsClient, DeviceInfo} from '../abs/client';
-import type {AudioTrack, Chapter, PlaybackSession} from '../abs/types';
+import type {AudioTrack, Chapter, PlaybackSession, SeriesRef} from '../abs/types';
 import {loadPlaybackRate, savePlaybackRate} from '../abs/store';
 import {PlayRateController} from '../platform/playRate';
 import {
@@ -28,6 +28,9 @@ export interface PlayerState {
 	author: string;
 	narrator: string;
 	seriesLine: string;
+	/** The book's first series, for Next in Series. */
+	series: SeriesRef | null;
+	libraryId: string | null;
 	coverUrl: string;
 	position: number;
 	duration: number;
@@ -62,6 +65,8 @@ export const idlePlayerState: PlayerState = {
 	author: '',
 	narrator: '',
 	seriesLine: '',
+	series: null,
+	libraryId: null,
 	coverUrl: '',
 	position: 0,
 	duration: 0,
@@ -149,8 +154,9 @@ export class PlayerEngine {
 
 	// ---- opening and closing ----------------------------------------------------------------------
 
-	/** Start a session for a book at the server's saved position. Closes any current session first. */
-	async open (itemId: string, autoplay = true): Promise<void> {
+	/** Start a session for a book at the server's saved position (or `startAt`, e.g. 0 to start over).
+	    Closes any current session first. */
+	async open (itemId: string, autoplay = true, startAt?: number): Promise<void> {
 		const token = ++this.openToken;
 		await this.close();
 		if (token !== this.openToken) return;
@@ -175,13 +181,15 @@ export class PlayerEngine {
 			const md = item.media.metadata;
 			const series = md.series && md.series[0];
 			const duration = session.duration || bookDuration(tracks);
-			const position = clamp(session.currentTime || 0, 0, duration);
+			const position = clamp(startAt !== undefined ? startAt : session.currentTime || 0, 0, duration);
 			this.lastSyncOk = Date.now();
 			this.set({
 				title: md.title || session.displayTitle,
 				author: md.authorName || session.displayAuthor || '',
 				narrator: md.narratorName || '',
 				seriesLine: series ? series.name + (series.sequence ? ' · Book ' + series.sequence : '') : '',
+				series: series || null,
+				libraryId: item.libraryId,
 				coverUrl: item.media.coverPath ? this.client.coverUrl(itemId) : '',
 				duration,
 				position,

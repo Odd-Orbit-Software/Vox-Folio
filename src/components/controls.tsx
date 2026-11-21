@@ -150,6 +150,11 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	const common = {width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true} as const;
 	const stroke = {fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'} as const;
 	switch (name) {
+		case 'home': return <svg {...common}><path {...stroke} d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" /></svg>;
+		case 'library': return <svg {...common}><path {...stroke} d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 5.5l3-0.8 3 14.5-3 0.8z" /></svg>;
+		case 'series': return <svg {...common}><g {...stroke}><rect x="3" y="8" width="13" height="13" rx="2" /><path d="M7 4h12a2 2 0 0 1 2 2v12" /></g></svg>;
+		case 'chapters': return <svg {...common}><g {...stroke}><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" /></g></svg>;
+		case 'autoplay': return <svg {...common}><g {...stroke}><path d="M4 12h12" /><path d="M12 6l6 6-6 6" /><path d="M21 5v14" /></g></svg>;
 		case 'play': return <svg {...common}><path d="M7 4l13 8-13 8z" fill="currentColor" /></svg>;
 		case 'pause': return <svg {...common}><path d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z" fill="currentColor" /></svg>;
 		case 'back30': return <svg {...common}><g {...stroke} strokeWidth={1.6}><path d="M4 12a8 8 0 1 0 2.3-5.7" /><path d="M4 3.5V8h4.5" /></g></svg>;
@@ -167,4 +172,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

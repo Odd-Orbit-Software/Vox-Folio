@@ -61,3 +61,11 @@ export function PanelScope ({id, className = '', children}: {id: string; classNa
 	}, [id]);
 	return <PanelContainer spotlightId={id} className={className}>{children}</PanelContainer>;
 }
+
+/** For clipped lists that move with a transform: focusing an off-screen item makes the browser scroll
+    the clipping box natively as well, which would double the movement. Keep that scroll at zero. */
+export function pinScroll (ev: {currentTarget: HTMLElement}): void {
+	const el = ev.currentTarget;
+	if (el.scrollTop !== 0) el.scrollTop = 0;
+	if (el.scrollLeft !== 0) el.scrollLeft = 0;
+}

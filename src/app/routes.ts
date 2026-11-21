@@ -1,0 +1,40 @@
+/* The app's screens as a stack, so Back returns to the previous screen with focus on what you left. */
+
+export type Route =
+	| {name: 'setup'}
+	| {name: 'home'}
+	| {name: 'library'}
+	| {name: 'series'}
+	| {name: 'seriesDetail'; libraryId: string; seriesId: string; seriesName: string; focusItemId?: string}
+	| {name: 'details'; itemId: string}
+	| {name: 'player'}
+	| {name: 'about'};
+
+export interface Entry {
+	route: Route;
+	/** `data-focus-key` of the item that was selected here, restored when we come back. */
+	focusKey: string | null;
+}
+
+/** Screens reachable from the side rail. Back from any of them goes Home (or to the player). */
+export const TABS: Route['name'][] = ['home', 'library', 'series'];
+
+export function entry (route: Route): Entry {
+	return {route, focusKey: null};
+}
+
+/** Push `route`, remembering `fromKey` as the focus to restore on the current screen. */
+export function push (stack: Entry[], route: Route, fromKey?: string | null): Entry[] {
+	const top = stack[stack.length - 1];
+	const kept = fromKey !== undefined && top ? stack.slice(0, -1).concat({...top, focusKey: fromKey}) : stack;
+	return kept.concat(entry(route));
+}
+
+export function pop (stack: Entry[]): Entry[] {
+	return stack.length > 1 ? stack.slice(0, -1) : stack;
+}
+
+/** Make `route` the only screen (rail tabs, sign-in, sign-out). */
+export function reset (route: Route): Entry[] {
+	return [entry(route)];
+}
