@@ -15,11 +15,25 @@ import {loadPlaybackRate, savePlaybackRate} from '../abs/store';
 import {PlayRateController} from '../platform/playRate';
 import {
 	bookDuration, chapterIndexAt, clamp, formatClock, locate, MAX_RATE, MIN_RATE,
-	nextChapterTarget, previousChapterTarget
+	nextChapterTarget, previousChapterTarget, rewindWithinChapter, smartRewindSeconds
 } from './timeline';
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
 export type SyncState = 'synced' | 'pending' | 'offline';
+
+/** A running sleep timer. `remainingMs` counts only while playing. */
+export type SleepState = (
+	| {mode: 'timer'; durationMs: number; remainingMs: number; prompt: boolean}
+	| {mode: 'chapter'; chapterIndex: number; remainingMs: number; prompt: boolean}
+) & {
+	/** Wall-clock time (ms) it will pause while playing, null while paused. Countdowns tick to this
+	    on their own clock, so they move evenly whatever the rhythm of the audio's progress events. */
+	endsAt?: number | null;
+};
+
+/** "Still listening?" shows this long before the timer stops; the audio fades over the last part. */
+export const SLEEP_PROMPT_MS = 30 * 1000;
+const SLEEP_FADE_MS = 10 * 1000;
 
 export interface PlayerState {
 	status: PlayerStatus;
@@ -45,6 +59,7 @@ export interface PlayerState {
 	error: AbsError | null;
 	/** A short message to show once, such as catching up with another device. */
 	notice: {id: number; text: string} | null;
+	sleep: SleepState | null;
 }
 
 const SYNC_INTERVAL_MS = 15000;
@@ -78,7 +93,8 @@ export const idlePlayerState: PlayerState = {
 	unsyncedSeconds: 0,
 	syncError: null,
 	error: null,
-	notice: null
+	notice: null,
+	sleep: null
 };
 
 export class PlayerEngine {
@@ -93,6 +109,8 @@ export class PlayerEngine {
 	private lastTick: number | null = null;
 	private syncTimer: number | null = null;
 	private syncing = false;
+	/** A sync was asked for while one was in flight; run another as soon as it finishes. */
+	private resync = false;
 	/** Wall-clock ms of the last successful sync, for the reconnect check. */
 	private lastSyncOk = 0;
 	private wasOffline = false;
@@ -100,6 +118,17 @@ export class PlayerEngine {
 	private seekSyncTimer: number | null = null;
 	private readonly rateCtl: PlayRateController;
 	private noticeId = 0;
+	/** When playback was last paused, for smart rewind. */
+	private pausedAt: number | null = null;
+	private sleepTick: number | null = null;
+	/** Timer mode's running remainder; published state is only refreshed when something visible changes. */
+	private sleepLeftMs = 0;
+	/** Step back a little on resume, more after longer pauses (settings). */
+	smartRewind = true;
+
+	setSmartRewind (on: boolean): void {
+		this.smartRewind = on;
+	}
 	private openToken = 0;
 
 	constructor (
@@ -161,11 +190,13 @@ export class PlayerEngine {
 		await this.close();
 		if (token !== this.openToken) return;
 
-		this.set({...idlePlayerState, rate: this.state.rate, status: 'loading', itemId});
+		this.set({...idlePlayerState, rate: this.state.rate, sleep: this.state.sleep, status: 'loading', itemId});
+		this.pausedAt = null;
 		try {
-			const [item, session] = await Promise.all([
+			const [item, session, progress] = await Promise.all([
 				this.client.getItem(itemId),
-				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio))
+				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio)),
+				startAt === undefined ? this.client.getProgress(itemId).catch(() => null) : Promise.resolve(null)
 			]);
 			if (token !== this.openToken) {
 				this.client.closeSession(session.id).catch(() => undefined);
@@ -181,7 +212,11 @@ export class PlayerEngine {
 			const md = item.media.metadata;
 			const series = md.series && md.series[0];
 			const duration = session.duration || bookDuration(tracks);
-			const position = clamp(startAt !== undefined ? startAt : session.currentTime || 0, 0, duration);
+			let position = clamp(startAt !== undefined ? startAt : session.currentTime || 0, 0, duration);
+			// Coming back to a book after a while: step back a little so the sentence makes sense.
+			if (startAt === undefined && this.smartRewind && progress && position > 0) {
+				position = rewindWithinChapter(session.chapters || [], position, smartRewindSeconds(Date.now() - progress.lastUpdate));
+			}
 			this.lastSyncOk = Date.now();
 			this.set({
 				title: md.title || session.displayTitle,
@@ -197,6 +232,11 @@ export class PlayerEngine {
 				chapterIndex: chapterIndexAt(session.chapters || [], position),
 				lastSyncedAt: Date.now()
 			});
+			// An end-of-chapter timer carried over from the previous book follows this book's chapter.
+			const sleep = this.state.sleep;
+			if (sleep && sleep.mode === 'chapter') {
+				this.set({sleep: {...sleep, chapterIndex: chapterIndexAt(session.chapters || [], position)}});
+			}
 			this.loadAt(position, autoplay);
 		} catch (e) {
 			if (token !== this.openToken) return;
@@ -233,8 +273,87 @@ export class PlayerEngine {
 		if (!this.session) return;
 		if (this.state.status === 'ended') {
 			this.seek(0);
+		} else if (this.smartRewind && this.pausedAt !== null) {
+			const back = smartRewindSeconds(Date.now() - this.pausedAt);
+			if (back > 0) this.seek(rewindWithinChapter(this.state.chapters, this.state.position, back));
 		}
+		this.pausedAt = null;
 		this.audio.play().catch(() => undefined);
+	}
+
+	// ---- sleep timer --------------------------------------------------------------------------------
+
+	/** Start, change or cancel the sleep timer: minutes, 'chapter' (end of the current chapter) or 'off'. */
+	setSleep (choice: number | 'chapter' | 'off'): void {
+		this.audio.volume = 1;
+		this.sleepTick = null;
+		if (choice === 'off') {
+			this.set({sleep: null});
+		} else if (choice === 'chapter') {
+			this.set({sleep: {mode: 'chapter', chapterIndex: Math.max(0, this.state.chapterIndex), remainingMs: this.chapterRemainingMs(Math.max(0, this.state.chapterIndex)), prompt: false}});
+		} else {
+			const ms = choice * 60 * 1000;
+			this.sleepLeftMs = ms;
+			this.set({sleep: {mode: 'timer', durationMs: ms, remainingMs: ms, prompt: false}});
+		}
+	}
+
+	/** "Still listening?" answered: add the same time again (or run to the end of the next chapter). */
+	extendSleep (): void {
+		const sleep = this.state.sleep;
+		if (!sleep) return;
+		this.audio.volume = 1;
+		if (sleep.mode === 'timer') {
+			this.sleepLeftMs += sleep.durationMs;
+			this.set({sleep: {...sleep, remainingMs: this.sleepLeftMs, prompt: false, endsAt: sleep.endsAt ? Date.now() + this.sleepLeftMs : null}});
+		} else {
+			const next = Math.min(sleep.chapterIndex + 1, Math.max(0, this.state.chapters.length - 1));
+			this.set({sleep: {mode: 'chapter', chapterIndex: next, remainingMs: this.chapterRemainingMs(next), prompt: false}});
+		}
+	}
+
+	/** Book position straight from the audio element (state.position only moves in whole seconds). */
+	private livePosition (): number {
+		const track = this.tracks[this.trackIndex];
+		return track && this.pendingOffset === null ? track.startOffset + this.audio.currentTime : this.state.position;
+	}
+
+	private chapterRemainingMs (index: number): number {
+		const chapter = this.state.chapters[index];
+		const end = chapter ? chapter.end : this.state.duration;
+		return Math.max(0, (end - this.livePosition()) / (this.state.rate || 1)) * 1000;
+	}
+
+	/** Runs on every timeupdate while playing: count down, fade, ask, and finally pause. */
+	private tickSleep (): void {
+		const sleep = this.state.sleep;
+		if (!sleep) return;
+		const now = Date.now();
+		let remaining: number;
+		if (sleep.mode === 'timer') {
+			const dt = this.sleepTick === null ? 0 : Math.min(MAX_TICK_S * 1000, Math.max(0, now - this.sleepTick));
+			remaining = this.sleepLeftMs - dt;
+			this.sleepLeftMs = remaining;
+		} else {
+			remaining = this.state.chapterIndex > sleep.chapterIndex ? 0 : this.chapterRemainingMs(sleep.chapterIndex);
+		}
+		this.sleepTick = now;
+		this.audio.volume = remaining < SLEEP_FADE_MS ? Math.max(0, remaining / SLEEP_FADE_MS) : 1;
+		if (remaining <= 0) {
+			this.sleepTick = null;
+			this.set({sleep: null});
+			this.pause();
+			this.audio.volume = 1;
+			this.notify('Sleep timer: paused at ' + formatClock(this.state.position));
+			return;
+		}
+		const prompt = remaining <= SLEEP_PROMPT_MS;
+		const endsAt = now + remaining;
+		// Re-emit when something visible changes, or the deadline drifts noticeably (seek, speed change).
+		const drift = sleep.endsAt ? Math.abs(endsAt - sleep.endsAt) : Infinity;
+		if (prompt !== sleep.prompt || drift > 400 || Math.floor(remaining / 60000) !== Math.floor(sleep.remainingMs / 60000)) {
+			this.set({sleep: {...sleep, remainingMs: remaining, prompt, endsAt}});
+		}
 	}
 
 	pause (): void {
@@ -372,12 +491,15 @@ export class PlayerEngine {
 		if (Math.floor(position) !== Math.floor(this.state.position) || chapterIndex !== this.state.chapterIndex) {
 			this.set({position, chapterIndex, unsyncedSeconds: Math.round(this.listened)});
 		}
+		if (!this.audio.paused) this.tickSleep();
 	};
 
 	private onPlaying = (): void => {
 		this.mediaRetries = 0;
 		this.rateCtl.apply(this.state.rate);
 		this.lastTick = Date.now();
+		this.sleepTick = Date.now();
+		this.pausedAt = null;
 		this.set({status: 'playing'});
 		this.startSyncTimer();
 	};
@@ -386,7 +508,9 @@ export class PlayerEngine {
 		if (this.state.status === 'ended' || this.pendingOffset !== null) return;
 		this.accumulate();
 		this.lastTick = null;
-		if (this.session) this.set({status: 'paused'});
+		this.sleepTick = null;
+		this.pausedAt = Date.now();
+		if (this.session) this.set({status: 'paused', sleep: this.state.sleep ? {...this.state.sleep, endsAt: null} : null});
 		this.stopSyncTimer();
 		this.sync();
 	};
@@ -432,7 +556,11 @@ export class PlayerEngine {
 
 	private async sync (): Promise<void> {
 		const session = this.session;
-		if (!session || this.syncing) return;
+		if (!session) return;
+		if (this.syncing) {
+			this.resync = true;
+			return;
+		}
 		this.syncing = true;
 		try {
 			if (this.wasOffline && await this.adoptNewerServerPosition(session.libraryItemId, true)) return;
@@ -449,6 +577,10 @@ export class PlayerEngine {
 			this.set({sync: offline ? 'offline' : 'pending', unsyncedSeconds: Math.round(this.listened), syncError: detail});
 		} finally {
 			this.syncing = false;
+			if (this.resync && this.session === session) {
+				this.resync = false;
+				this.sync();
+			}
 		}
 	}
 
@@ -465,7 +597,10 @@ export class PlayerEngine {
 		this.listened = 0;
 		this.lastSyncOk = Date.now();
 		this.wasOffline = false;
-		this.seek(progress.currentTime);
+		const back = this.smartRewind ? smartRewindSeconds(Date.now() - progress.lastUpdate) : 0;
+		this.seek(rewindWithinChapter(this.state.chapters, progress.currentTime, back));
+		// The rewind for the other device's pause is applied here; don't add ours on play.
+		this.pausedAt = null;
 		this.set({sync: 'synced', lastSyncedAt: this.lastSyncOk, unsyncedSeconds: 0});
 		this.notify('Picked up from another device at ' + formatClock(progress.currentTime));
 		return true;

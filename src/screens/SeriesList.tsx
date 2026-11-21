@@ -33,12 +33,12 @@ interface SeriesListProps {
 	client: AbsClient;
 	restoreKey: string | null;
 	onTab: (name: Route['name']) => void;
-	onAbout: () => void;
+	onSettings: () => void;
 	onOpenSeries: (libraryId: string, series: Series, fromKey: string) => void;
 }
 
 /** Every series in the library, by name, shown by its first book's cover. */
-export default function SeriesList ({client, restoreKey, onTab, onAbout, onOpenSeries}: SeriesListProps) {
+export default function SeriesList ({client, restoreKey, onTab, onSettings, onOpenSeries}: SeriesListProps) {
 	const [loaded, setLoaded] = useState<Loaded | null>(cache);
 	const [error, setError] = useState<AbsError | null>(null);
 	const [reload, setReload] = useState(0);
@@ -88,7 +88,7 @@ export default function SeriesList ({client, restoreKey, onTab, onAbout, onOpenS
 
 	return (
 		<ScreenContainer id="series" className="vf-browse" restoreKey={restoreKey} focusDeps={[items.length > 0, error]}>
-			<Rail active="series" onTab={onTab} onAbout={onAbout} />
+			<Rail active="series" onTab={onTab} onSettings={onSettings} />
 			<header className="vf-browse__head">
 				<div className="vf-browse__title">
 					<h1 className="vf-browse__h1">Series</h1>

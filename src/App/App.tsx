@@ -5,12 +5,13 @@ import {useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExtern
 import appinfo from '../../webos-meta/appinfo.json';
 import {AbsClient, login, normaliseServerUrl} from '../abs/client';
 import type {Credentials} from '../abs/client';
-import {deviceId, loadAutoplay, loadCredentials, saveAutoplay, saveCredentials} from '../abs/store';
+import {deviceId, loadCredentials, saveCredentials} from '../abs/store';
 import {IdleWatcher} from '../app/idle';
 import {decideLaunch} from '../app/launch';
 import {pop, push, reset} from '../app/routes';
 import type {Entry, Route} from '../app/routes';
 import {nextInSeries} from '../app/series';
+import {getSettings, updateSettings, useSettings} from '../app/settings';
 import type {SeriesEntry} from '../app/series';
 import {Screensaver} from '../components/Screensaver';
 import {Toasts} from '../components/Toasts';
@@ -27,6 +28,7 @@ import Library from '../screens/Library';
 import Player from '../screens/Player';
 import SeriesDetail from '../screens/SeriesDetail';
 import SeriesList from '../screens/SeriesList';
+import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
 
 /* One <audio> element for the app's lifetime. It must be in the document: on webOS a detached media
@@ -96,7 +98,6 @@ function App () {
 	const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 	const [authMessage, setAuthMessage] = useState('');
 	const [toasts, setToasts] = useState<Toast[]>([]);
-	const [autoplay, setAutoplay] = useState(loadAutoplay);
 	const [upNext, setUpNext] = useState<UpNext | null>(null);
 	// Books whose Up Next the listener turned down ("Not now"), so autoplay skips them.
 	const [declined, setDeclined] = useState<string[]>([]);
@@ -107,8 +108,38 @@ function App () {
 	const creds = session ? session.creds : null;
 	const player = usePlayer(engine);
 	const asleep = useSyncExternalStore(subscribeIdle, getIdle);
+	const settings = useSettings();
+	const autoplay = settings.seriesAutoplay;
 	const top = stack[stack.length - 1];
 	const route = top.route;
+
+	// Smart rewind follows the setting.
+	useEffect(() => {
+		if (engine) engine.setSmartRewind(settings.smartRewind);
+	}, [engine, settings.smartRewind]);
+
+	// "Still listening?": any key keeps listening, including the press that wakes the screensaver.
+	useEffect(() => {
+		if (!engine) return undefined;
+		const prompting = () => {
+			const s = engine.getState().sleep;
+			return Boolean(s && s.prompt);
+		};
+		const onKey = (ev: KeyboardEvent) => {
+			if (!prompting()) return;
+			ev.preventDefault();
+			ev.stopImmediatePropagation();
+			engine.extendSleep();
+		};
+		window.addEventListener('keydown', onKey, true);
+		const unsubscribe = idle.subscribe((isAsleep) => {
+			if (!isAsleep && prompting()) engine.extendSleep();
+		});
+		return () => {
+			window.removeEventListener('keydown', onKey, true);
+			unsubscribe();
+		};
+	}, [engine]);
 
 	// The engine shares the one <audio> element; detach the old one when the account changes.
 	useEffect(() => () => {
@@ -283,11 +314,9 @@ function App () {
 	}, [engine, pushToast, signOut, playNext]);
 
 	const toggleAutoplay = useCallback(() => {
-		setAutoplay((on) => {
-			saveAutoplay(!on);
-			pushToast(on ? 'Series autoplay off' : 'Series autoplay on');
-			return !on;
-		});
+		const on = !getSettings().seriesAutoplay;
+		updateSettings({seriesAutoplay: on});
+		pushToast(on ? 'Series autoplay on' : 'Series autoplay off');
 	}, [pushToast]);
 
 	// Save the position when the TV hides the app (Home button, input switch, power off).
@@ -337,8 +366,8 @@ function App () {
 			if (!e || !loaded) return;
 			if (code === Keys.PLAY) e.play();
 			else if (code === Keys.PAUSE) e.toggle();
-			else if (code === Keys.REWIND) e.skip(-30);
-			else if (code === Keys.FAST_FORWARD) e.skip(30);
+			else if (code === Keys.REWIND) e.skip(-getSettings().skipBack);
+			else if (code === Keys.FAST_FORWARD) e.skip(getSettings().skipForward);
 			else if (code === Keys.STOP) e.pause();
 			else return;
 			ev.preventDefault();
@@ -362,9 +391,9 @@ function App () {
 	}, [route]);
 
 	const onTab = (name: Route['name']) => {
-		if (name === 'home' || name === 'library' || name === 'series') setStack(reset({name} as Route));
+		if (name === 'home' || name === 'library' || name === 'series' || name === 'settings') setStack(reset({name} as Route));
 	};
-	const onAbout = () => go({name: 'about'}, 'rail:about');
+	const onSettings = () => onTab('settings');
 	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
 
 	return (
@@ -389,7 +418,7 @@ function App () {
 					onDetails={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 					onShowPlayer={(fromKey) => showPlayer(fromKey)}
 					onTab={onTab}
-					onAbout={onAbout}
+					onSettings={onSettings}
 				/>
 			)}
 			{route.name === 'library' && client && (
@@ -397,7 +426,7 @@ function App () {
 					client={client}
 					restoreKey={top.focusKey}
 					onTab={onTab}
-					onAbout={onAbout}
+					onSettings={onSettings}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 				/>
 			)}
@@ -406,7 +435,7 @@ function App () {
 					client={client}
 					restoreKey={top.focusKey}
 					onTab={onTab}
-					onAbout={onAbout}
+					onSettings={onSettings}
 					onOpenSeries={(libraryId, series, fromKey) => go({name: 'seriesDetail', libraryId, seriesId: series.id, seriesName: series.name}, fromKey)}
 				/>
 			)}
@@ -451,6 +480,19 @@ function App () {
 					}}
 					onHome={() => setStack(reset({name: 'home'}))}
 					onRetry={() => player.itemId && openBook(engine, player.itemId)}
+					skipBack={settings.skipBack}
+					skipForward={settings.skipForward}
+					sleepDefault={settings.sleepDefault}
+				/>
+			)}
+			{route.name === 'settings' && (
+				<SettingsScreen
+					creds={creds}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onSettings={onSettings}
+					onAbout={() => go({name: 'about'}, 'about')}
+					onSignOut={() => signOut('')}
 				/>
 			)}
 			{route.name === 'about' && (

@@ -150,6 +150,9 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	const common = {width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true} as const;
 	const stroke = {fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'} as const;
 	switch (name) {
+		case 'settings': return <svg {...common}><g {...stroke}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></g></svg>;
+		case 'chevronRight': return <svg {...common}><path {...stroke} d="M9 6l6 6-6 6" /></svg>;
+		case 'moon': return <svg {...common}><path {...stroke} d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>;
 		case 'home': return <svg {...common}><path {...stroke} d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" /></svg>;
 		case 'library': return <svg {...common}><path {...stroke} d="M4 4h4v16H4zM10 4h4v16h-4zM16.5 5.5l3-0.8 3 14.5-3 0.8z" /></svg>;
 		case 'series': return <svg {...common}><g {...stroke}><rect x="3" y="8" width="13" height="13" rx="2" /><path d="M7 4h12a2 2 0 0 1 2 2v12" /></g></svg>;
@@ -172,4 +175,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

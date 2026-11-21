@@ -1,7 +1,7 @@
 import type {AudioTrack, Chapter} from '../abs/types';
 import {
 	bookDuration, chapterIndexAt, formatClock, formatDuration, formatRate, locate,
-	nextChapterTarget, previousChapterTarget, seekStepForRepeat, stepRate
+	nextChapterTarget, previousChapterTarget, rewindWithinChapter, seekStepForRepeat, smartRewindSeconds, stepRate
 } from './timeline';
 
 const track = (index: number, startOffset: number, duration: number): AudioTrack => ({
@@ -105,5 +105,21 @@ describe('formatting', () => {
 		expect(seekStepForRepeat(0)).toBe(10);
 		expect(seekStepForRepeat(8)).toBe(60);
 		expect(seekStepForRepeat(30)).toBe(300);
+	});
+});
+
+describe('smart rewind', () => {
+	it('grows with the length of the pause', () => {
+		expect(smartRewindSeconds(20 * 1000)).toBe(0);
+		expect(smartRewindSeconds(2 * 60 * 1000)).toBe(5);
+		expect(smartRewindSeconds(15 * 60 * 1000)).toBe(15);
+		expect(smartRewindSeconds(3 * 60 * 60 * 1000)).toBe(30);
+	});
+
+	it('never goes back past the start of the chapter', () => {
+		expect(rewindWithinChapter(chapters, 700, 15)).toBe(685);
+		expect(rewindWithinChapter(chapters, 612, 30)).toBe(608.18);
+		expect(rewindWithinChapter([], 20, 30)).toBe(0);
+		expect(rewindWithinChapter(chapters, 700, 0)).toBe(700);
 	});
 });

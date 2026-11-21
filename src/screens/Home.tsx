@@ -18,7 +18,7 @@ interface HomeProps {
 	onDetails: (itemId: string, fromKey: string) => void;
 	onShowPlayer: (fromKey: string) => void;
 	onTab: (name: Route['name']) => void;
-	onAbout: () => void;
+	onSettings: () => void;
 }
 
 interface Entry {
@@ -38,7 +38,7 @@ function percent (e: Entry): number {
 	return e.progress ? Math.round(e.progress.progress * 100) : 0;
 }
 
-export default function Home ({client, player, restoreKey, onPlay, onDetails, onShowPlayer, onTab, onAbout}: HomeProps) {
+export default function Home ({client, player, restoreKey, onPlay, onDetails, onShowPlayer, onTab, onSettings}: HomeProps) {
 	const [load, setLoad] = useState<Load>({state: 'loading'});
 
 	const [reload, setReload] = useState(0);
@@ -67,7 +67,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 
 	return (
 		<ScreenContainer id="home" className="vf-home vf-browse" restoreKey={restoreKey} focusDeps={[load.state]}>
-			<Rail active="home" onTab={onTab} onAbout={onAbout} />
+			<Rail active="home" onTab={onTab} onSettings={onSettings} />
 			<header className="vf-topbar">
 				<h1 className="vf-browse__h1">Home</h1>
 				<div className="vf-topbar__actions">

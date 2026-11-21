@@ -49,7 +49,7 @@ interface LibraryProps {
 	client: AbsClient;
 	restoreKey: string | null;
 	onTab: (name: Route['name']) => void;
-	onAbout: () => void;
+	onSettings: () => void;
 	onOpenTitle: (itemId: string, fromKey: string) => void;
 }
 
@@ -69,7 +69,7 @@ export function toGridItem (client: AbsClient, item: LibraryItem, progress: Medi
 	};
 }
 
-export default function Library ({client, restoreKey, onTab, onAbout, onOpenTitle}: LibraryProps) {
+export default function Library ({client, restoreKey, onTab, onSettings, onOpenTitle}: LibraryProps) {
 	const [libraries, setLibraries] = useState<LibraryInfo[] | null>(libsCache);
 	const [libraryId, setLibraryId] = useState<string | null>(cache ? cache.libraryId : null);
 	const [sort, setSort] = useState<SortId>(cache ? cache.sort : 'recent');
@@ -154,7 +154,7 @@ export default function Library ({client, restoreKey, onTab, onAbout, onOpenTitl
 
 	return (
 		<ScreenContainer id="library" className="vf-browse" restoreKey={restoreKey} focusDeps={[items.length > 0, error]}>
-			<Rail active="library" onTab={onTab} onAbout={onAbout} />
+			<Rail active="library" onTab={onTab} onSettings={onSettings} />
 			<header className="vf-browse__head">
 				<div className="vf-browse__title">
 					{libraries && libraries.length > 1 ? (

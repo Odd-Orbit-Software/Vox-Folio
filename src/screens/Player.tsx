@@ -7,7 +7,8 @@ import {focusWithin, PanelScope, pinScroll, ScreenContainer} from '../components
 import type {Chapter} from '../abs/types';
 import {bookLabel} from '../app/series';
 import type {SeriesEntry} from '../app/series';
-import type {PlayerEngine, PlayerState} from '../player/engine';
+import type {SleepDefault} from '../app/settings';
+import type {PlayerEngine, PlayerState, SleepState} from '../player/engine';
 import {
 	chapterIndexAt, clamp, formatClock, formatDuration, formatRate, RATE_PRESETS, seekStepForRepeat, stepRate
 } from '../player/timeline';
@@ -25,9 +26,73 @@ interface PlayerProps {
 	onDeclineNext: () => void;
 	onHome: () => void;
 	onRetry: () => void;
+	skipBack: number;
+	skipForward: number;
+	/** What the sleep panel offers first. */
+	sleepDefault: SleepDefault;
 }
 
-type Panel = 'none' | 'speed' | 'chapters';
+type Panel = 'none' | 'speed' | 'chapters' | 'sleep';
+
+const SLEEP_OPTIONS: SleepDefault[] = ['off', 'chapter', 15, 30, 45, 60];
+
+export function sleepChipLabel (sleep: SleepState | null): string {
+	if (!sleep) return 'Sleep';
+	if (sleep.mode === 'chapter') return 'End of chapter';
+	return formatDuration(Math.ceil(sleep.remainingMs / 60000) * 60);
+}
+
+function SleepPanel ({sleep, preferred, onPick}: {sleep: SleepState | null; preferred: SleepDefault; onPick: (c: SleepDefault) => void}) {
+	const active: SleepDefault | null = !sleep ? 'off' : sleep.mode === 'chapter' ? 'chapter' : null;
+	const focusOn = active && active !== 'off' ? active : preferred;
+	return (
+		<>
+			<div className="vf-scrim" />
+			<PanelScope id="sleep-panel" className="vf-panel">
+				<div className="vf-panel__head">
+					<h2 className="vf-panel__title">Sleep timer</h2>
+					<span className="vf-muted">Back to close</span>
+				</div>
+				{sleep && <p className="vf-panel__status">{sleep.mode === 'chapter' ? 'Pausing at the end of this chapter' : 'Pausing in ' + formatDuration(Math.ceil(sleep.remainingMs / 1000))}</p>}
+				<div className="vf-sleep">
+					{SLEEP_OPTIONS.map((o) => (
+						<Button
+							key={String(o)}
+							className={'vf-sleep__option' + (o === active ? ' is-selected' : '')}
+							data-default-focus={o === focusOn || undefined}
+							onClick={() => onPick(o)}
+						>
+							{o === 'off' ? (sleep ? 'Turn off' : 'Off') : o === 'chapter' ? 'End of chapter' : o + ' minutes'}
+						</Button>
+					))}
+				</div>
+				<p className="vf-panel__note">The audio fades out gently, and &ldquo;Still listening?&rdquo; appears first. Press any key then to keep going.</p>
+			</PanelScope>
+		</>
+	);
+}
+
+/** Seconds left on the sleep timer, ticking evenly on its own clock towards the engine's deadline. */
+export function useSleepSeconds (sleep: SleepState | null): number {
+	const now = useNow(250);
+	if (!sleep) return 0;
+	if (sleep.endsAt && now) return Math.max(0, Math.ceil((sleep.endsAt - now) / 1000));
+	return Math.max(0, Math.ceil(sleep.remainingMs / 1000));
+}
+
+export function StillListening ({sleep}: {sleep: SleepState}) {
+	const seconds = useSleepSeconds(sleep);
+	const more = sleep.mode === 'chapter' ? 'to the end of the next chapter' : 'for another ' + formatDuration(sleep.durationMs / 1000);
+	return (
+		<div className="vf-still" role="alertdialog" aria-label="Still listening?">
+			<Icon name="moon" size={40} />
+			<div>
+				<div className="vf-still__title">Still listening?</div>
+				<div className="vf-still__body">{'Pausing in ' + seconds + 's. Press any key to keep listening ' + more + '.'}</div>
+			</div>
+		</div>
+	);
+}
 
 /** Show Up Next this many seconds (real time, at the current speed) before the end. */
 const UP_NEXT_SECONDS = 15;
@@ -140,7 +205,7 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry}: PlayerProps) {
+export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault}: PlayerProps) {
 	const [panel, setPanel] = useState<Panel>('none');
 	const speedOpen = panel === 'speed';
 	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
@@ -160,6 +225,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
 			else if (code === Keys.RED && player.chapters.length) setPanel((o) => (o === 'chapters' ? 'none' : 'chapters'));
 			else if (code === Keys.BLUE) onToggleAutoplay();
+			else if (code === Keys.YELLOW) setPanel((o) => (o === 'sleep' ? 'none' : 'sleep'));
 			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
 			else if (code === Keys.CH_DOWN && panel === 'none') engine.previousChapter();
 			else handled = false;
@@ -307,10 +373,14 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 				</Tile>
 
 				<div className="vf-transport">
-					<div className="vf-transport__side vf-muted">◀◀ ▶▶ 30s · CH ▲▼ chapter</div>
+					<div className="vf-transport__side vf-transport__side--start">
+						<Button variant="chip" className={p.sleep ? 'is-active' : ''} data-focus-key="sleep" onClick={() => setPanel('sleep')}>
+							<span className="vf-dot vf-dot--yellow" />{sleepChipLabel(p.sleep)}
+						</Button>
+					</div>
 					<div className="vf-transport__main">
 						<Button variant="icon" className="vf-round" aria-label="Previous chapter" disabled={!p.chapters.length} onClick={() => engine.previousChapter()}><Icon name="prevChapter" size={34} /></Button>
-						<Button variant="icon" className="vf-round" aria-label="Back 30 seconds" onClick={() => engine.skip(-30)}><Icon name="back30" size={46} /><span className="vf-round__num">30</span></Button>
+						<Button variant="icon" className="vf-round" aria-label={'Back ' + skipBack + ' seconds'} onClick={() => engine.skip(-skipBack)}><Icon name="back30" size={46} /><span className="vf-round__num">{skipBack}</span></Button>
 						<Button
 							variant="primary"
 							className="vf-round vf-round--play"
@@ -321,7 +391,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						>
 							<Icon name={p.status === 'playing' || p.status === 'loading' ? 'pause' : 'play'} size={48} />
 						</Button>
-						<Button variant="icon" className="vf-round" aria-label="Forward 30 seconds" onClick={() => engine.skip(30)}><Icon name="fwd30" size={46} /><span className="vf-round__num">30</span></Button>
+						<Button variant="icon" className="vf-round" aria-label={'Forward ' + skipForward + ' seconds'} onClick={() => engine.skip(skipForward)}><Icon name="fwd30" size={46} /><span className="vf-round__num">{skipForward}</span></Button>
 						<Button variant="icon" className="vf-round" aria-label="Next chapter" disabled={!p.chapters.length} onClick={() => engine.nextChapter()}><Icon name="nextChapter" size={34} /></Button>
 					</div>
 					<div className="vf-transport__side vf-transport__side--end">
@@ -338,6 +408,17 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 			</div>
 
 			{speedOpen && <SpeedPanel rate={p.rate} onRate={(r) => engine.setRate(r)} />}
+			{panel === 'sleep' && (
+				<SleepPanel
+					sleep={p.sleep}
+					preferred={sleepDefault}
+					onPick={(c) => {
+						engine.setSleep(c);
+						setPanel('none');
+					}}
+				/>
+			)}
+			{p.sleep && p.sleep.prompt && panel === 'none' && <StillListening sleep={p.sleep} />}
 			{panel === 'chapters' && (
 				<ChaptersPanel
 					chapters={p.chapters}

@@ -8,6 +8,7 @@ class FakeAudio extends EventTarget {
 	paused = true;
 	currentTime = 0;
 	readyState = 0;
+	volume = 1;
 	playbackRate = 1;
 	defaultPlaybackRate = 1;
 	preload = '';
@@ -119,9 +120,11 @@ afterEach(() => {
 	jest.useRealTimers();
 });
 
-async function openEngine (c = makeClient()) {
+async function openEngine (c = makeClient(), smartRewind = false) {
 	const audio = new FakeAudio();
 	const engine = new PlayerEngine(c.client, audio as unknown as HTMLAudioElement, device);
+	// Most tests are about sync; smart rewind has its own tests below.
+	engine.smartRewind = smartRewind;
 	await engine.open('item-1');
 	return {audio, engine, ...c};
 }
@@ -315,4 +318,139 @@ test('can start over from the beginning instead of the saved position', async ()
 	await engine.open('item-1', true, 0);
 	expect(engine.getState().position).toBe(0);
 	expect(audio.currentTime).toBe(0);
+});
+
+describe('smart rewind', () => {
+	test('resuming after a ten-minute pause steps back 15 s', async () => {
+		const {audio, engine} = await openEngine(makeClient(), true);
+		jest.setSystemTime(1_000_000 + 2000);
+		audio.advance(2);
+		engine.pause();
+		jest.setSystemTime(1_000_000 + 2000 + 11 * 60 * 1000);
+		engine.play();
+		expect(engine.getState().position).toBe(87);
+	});
+
+	test('a short pause resumes exactly where it stopped', async () => {
+		const {audio, engine} = await openEngine(makeClient(), true);
+		audio.advance(2);
+		engine.pause();
+		jest.setSystemTime(1_000_000 + 20000);
+		engine.play();
+		expect(engine.getState().position).toBe(102);
+	});
+
+	test('opening a book last played an hour ago starts 30 s earlier, within the chapter', async () => {
+		const c = makeClient({
+			getProgress: jest.fn(async () => ({libraryItemId: 'item-1', currentTime: 100, duration: 1200, progress: 0.08, isFinished: false, lastUpdate: 1_000_000 - 2 * 60 * 60 * 1000}))
+		});
+		const {engine} = await openEngine(c, true);
+		expect(engine.getState().position).toBe(70);
+	});
+
+	test('it never rewinds past the start of the chapter', async () => {
+		const c = makeClient({
+			startPlayback: jest.fn(async () => session(610)),
+			getProgress: jest.fn(async () => ({libraryItemId: 'item-1', currentTime: 610, duration: 1200, progress: 0.5, isFinished: false, lastUpdate: 0}))
+		});
+		const {engine} = await openEngine(c, true);
+		expect(engine.getState().position).toBe(600);
+	});
+
+	test('starting over does not rewind', async () => {
+		const c = makeClient();
+		const audio = new FakeAudio();
+		const engine = new PlayerEngine(c.client, audio as unknown as HTMLAudioElement, device);
+		await engine.open('item-1', true, 0);
+		expect(engine.getState().position).toBe(0);
+	});
+});
+
+describe('sleep timer', () => {
+	function playFor (audio: FakeAudio, seconds: number, startMs: number) {
+		for (let i = 1; i <= seconds; i++) {
+			jest.setSystemTime(startMs + i * 1000);
+			audio.advance(1);
+		}
+		return startMs + seconds * 1000;
+	}
+
+	test('asks "still listening?", fades, then pauses when the time is up', async () => {
+		const {audio, engine} = await openEngine();
+		engine.setSleep(1);
+		let t = playFor(audio, 25, 1_000_000);
+		expect(engine.getState().sleep!.prompt).toBe(false);
+		t = playFor(audio, 10, t);
+		expect(engine.getState().sleep!.prompt).toBe(true);
+		t = playFor(audio, 20, t);
+		expect(audio.volume).toBeLessThan(1);
+		playFor(audio, 6, t);
+		expect(audio.paused).toBe(true);
+		expect(engine.getState().sleep).toBeNull();
+		expect(audio.volume).toBe(1);
+		expect(engine.getState().notice!.text).toMatch(/Sleep timer/);
+	});
+
+	test('time paused does not count', async () => {
+		const {audio, engine} = await openEngine();
+		engine.setSleep(1);
+		playFor(audio, 10, 1_000_000);
+		engine.pause();
+		jest.setSystemTime(1_000_000 + 10 * 60 * 1000);
+		engine.play();
+		playFor(audio, 5, 1_000_000 + 10 * 60 * 1000);
+		expect(engine.getState().sleep!.remainingMs).toBeGreaterThan(40 * 1000);
+	});
+
+	test('extending adds the same time again and restores the volume', async () => {
+		const {audio, engine} = await openEngine();
+		engine.setSleep(1);
+		playFor(audio, 55, 1_000_000);
+		expect(audio.volume).toBeLessThan(1);
+		engine.extendSleep();
+		expect(audio.volume).toBe(1);
+		expect(engine.getState().sleep!.prompt).toBe(false);
+		expect(engine.getState().sleep!.remainingMs).toBeGreaterThan(60 * 1000);
+	});
+
+	test('end of chapter pauses when the chapter ends', async () => {
+		const c = makeClient({startPlayback: jest.fn(async () => session(590))});
+		const {audio, engine} = await openEngine(c);
+		engine.setSleep('chapter');
+		expect(engine.getState().sleep!.mode).toBe('chapter');
+		playFor(audio, 11, 1_000_000);
+		expect(audio.paused).toBe(true);
+		expect(engine.getState().sleep).toBeNull();
+	});
+
+	test('off cancels it', async () => {
+		const {engine} = await openEngine();
+		engine.setSleep(30);
+		engine.setSleep('off');
+		expect(engine.getState().sleep).toBeNull();
+	});
+});
+
+test('a sync asked for while another is in flight still happens, with the latest position', async () => {
+	let release: () => void = () => undefined;
+	const syncs: SyncPayload[] = [];
+	const c = makeClient({
+		syncSession: jest.fn((_id: string, p: SyncPayload) => {
+			syncs.push(p);
+			return syncs.length === 1 ? new Promise<void>((r) => {
+				release = r;
+			}) : Promise.resolve();
+		})
+	});
+	const {audio, engine} = await openEngine(c);
+	engine.pause(); // first sync starts and hangs
+	engine.play();
+	jest.setSystemTime(1_000_000 + 3000);
+	audio.advance(3);
+	engine.pause(); // asks again while the first is in flight
+	release();
+	await flush();
+	await flush();
+	expect(syncs).toHaveLength(2);
+	expect(syncs[1].currentTime).toBe(103);
 });

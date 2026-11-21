@@ -102,3 +102,20 @@ export function formatDuration (seconds: number): string {
 	if (m) return m + 'm';
 	return s + 's';
 }
+
+/** Smart rewind: how far to step back when resuming after a pause of `pausedMs`.
+    Under a minute: nothing. Then about 5 s, 15 s after ten minutes, 30 s after an hour. */
+export function smartRewindSeconds (pausedMs: number): number {
+	if (pausedMs < 60 * 1000) return 0;
+	if (pausedMs < 10 * 60 * 1000) return 5;
+	if (pausedMs < 60 * 60 * 1000) return 15;
+	return 30;
+}
+
+/** Step back `seconds` from `position`, but never before the start of the chapter it's in. */
+export function rewindWithinChapter (chapters: Chapter[], position: number, seconds: number): number {
+	if (seconds <= 0) return position;
+	const i = chapterIndexAt(chapters, position);
+	const floor = i >= 0 ? chapters[i].start : 0;
+	return Math.max(floor, position - seconds, 0);
+}

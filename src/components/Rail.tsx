@@ -29,7 +29,7 @@ function isLeftmostInRow (el: Element, scope: Element): boolean {
 
 /** The side rail on the browse screens (design board 02). OK switches screen. Left from the leftmost
     item in any row comes here (Spotlight alone would pick the nearest thing down-left instead). */
-export function Rail ({active, onTab, onAbout}: {active: Route['name']; onTab: (name: Route['name']) => void; onAbout: () => void}) {
+export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab: (name: Route['name']) => void; onSettings: () => void}) {
 	const nav = useRef<HTMLElement>(null);
 
 	useEffect(() => {
@@ -67,8 +67,15 @@ export function Rail ({active, onTab, onAbout}: {active: Route['name']; onTab: (
 					</Button>
 				))}
 			</div>
-			<Button variant="icon" className="vf-rail__btn" aria-label="About Vox Folio" data-focus-key="rail:about" onClick={onAbout}>
-				<Icon name="info" size={30} />
+			<Button
+				variant="icon"
+				className={'vf-rail__btn' + (active === 'settings' ? ' is-active' : '')}
+				aria-label="Settings"
+				aria-current={active === 'settings' ? 'page' : undefined}
+				data-focus-key="rail:settings"
+				onClick={onSettings}
+			>
+				<Icon name="settings" size={30} />
 			</Button>
 		</nav>
 	);

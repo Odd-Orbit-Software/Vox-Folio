@@ -1,5 +1,6 @@
 import mark from '../assets/vox-folio-mark.svg';
 import type {PlayerState} from '../player/engine';
+import {formatDuration} from '../player/timeline';
 import {Clock} from './Clock';
 import {Cover} from './controls';
 
@@ -25,6 +26,13 @@ export function Screensaver ({player}: {player: PlayerState}) {
 									{chapter ? chapter.title : book.author}
 									{book.status === 'paused' ? ' · Paused' : ''}
 								</div>
+								{book.sleep && (
+									<div className={'vf-saver__sleep' + (book.sleep.prompt ? ' is-prompt' : '')}>
+										{book.sleep.prompt
+											? 'Still listening? Press any key'
+											: book.sleep.mode === 'chapter' ? 'Sleep at end of chapter' : 'Sleep in ' + formatDuration(Math.ceil(book.sleep.remainingMs / 60000) * 60)}
+									</div>
+								)}
 								<div className="vf-saver__progress">
 									<div className="vf-bar vf-saver__bar"><div className="vf-bar__fill" style={{width: percent + '%'}} /></div>
 									<span className="vf-saver__pct">{percent + '%'}</span>

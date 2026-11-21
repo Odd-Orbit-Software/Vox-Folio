@@ -8,6 +8,7 @@ export type Route =
 	| {name: 'seriesDetail'; libraryId: string; seriesId: string; seriesName: string; focusItemId?: string}
 	| {name: 'details'; itemId: string}
 	| {name: 'player'}
+	| {name: 'settings'}
 	| {name: 'about'};
 
 export interface Entry {
@@ -17,7 +18,7 @@ export interface Entry {
 }
 
 /** Screens reachable from the side rail. Back from any of them goes Home (or to the player). */
-export const TABS: Route['name'][] = ['home', 'library', 'series'];
+export const TABS: Route['name'][] = ['home', 'library', 'series', 'settings'];
 
 export function entry (route: Route): Entry {
 	return {route, focusKey: null};
