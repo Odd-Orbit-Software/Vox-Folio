@@ -40,6 +40,7 @@ These are honoured only when `probe` is also present, so a normal launch never t
 | `server` | With `probe`, checks what the TV's engine allows against that server (CORS and so on) |
 | `devLogin` | `{server, username, password}`: signs in without typing on the TV |
 | `keys` | Replays remote presses, e.g. `"down,ok,wait,green,ok,back"` |
+| `searchText` | Pre-fills the Search box, since replayed keys can't type |
 | `idle` | Seconds of no input before the screensaver appears, for testing. Normally it appears only when the TV asks |
 
 ## Things this TV taught us

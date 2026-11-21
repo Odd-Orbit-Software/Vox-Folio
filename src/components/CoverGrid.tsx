@@ -13,6 +13,8 @@ export interface GridItem {
 	percent: number | null;
 	finished?: boolean;
 	badge?: string;
+	/** Round crop, for author portraits. */
+	round?: boolean;
 }
 
 const COLUMNS = 6;
@@ -58,8 +60,8 @@ export function CoverGrid ({items, onSelect, onNearEnd, initialRow = 0, onRowCha
 						onFocus={() => onFocusIndex(i)}
 						onClick={() => onSelect(item)}
 					>
-						<div className="vf-grid__cover">
-							<Cover url={item.coverUrl} title={item.title} author={item.author} size={240} />
+						<div className={'vf-grid__cover' + (item.round ? ' vf-grid__cover--round' : '')}>
+							<Cover url={item.coverUrl} title={item.title} author={item.author} size={240} round={item.round} />
 							{item.finished && <span className="vf-badge vf-badge--done">Finished</span>}
 							{!item.finished && item.badge && <span className="vf-badge">{item.badge}</span>}
 							{item.percent !== null && !item.finished && (

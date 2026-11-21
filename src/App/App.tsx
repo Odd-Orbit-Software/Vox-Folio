@@ -8,7 +8,7 @@ import type {Credentials} from '../abs/client';
 import {deviceId, loadCredentials, saveCredentials} from '../abs/store';
 import {IdleWatcher} from '../app/idle';
 import {decideLaunch} from '../app/launch';
-import {pop, push, reset} from '../app/routes';
+import {pop, push, reset, TABS} from '../app/routes';
 import type {Entry, Route} from '../app/routes';
 import {nextInSeries} from '../app/series';
 import {getSettings, updateSettings, useSettings} from '../app/settings';
@@ -22,11 +22,16 @@ import type {PlayerState} from '../player/engine';
 import {controlTvScreensaver} from '../platform/screensaver';
 import {activate, exitApp, isBackKey, Keys, onRelaunch, readLaunchParams, requestedItemId} from '../platform/webos';
 import About from '../screens/About';
+import AuthorScreen from '../screens/Author';
+import Authors from '../screens/Authors';
+import BookList from '../screens/BookList';
+import Collections from '../screens/Collections';
 import Details from '../screens/Details';
 import Home from '../screens/Home';
 import Library from '../screens/Library';
 import Player from '../screens/Player';
 import SeriesDetail from '../screens/SeriesDetail';
+import Search, {presetSearch} from '../screens/Search';
 import SeriesList from '../screens/SeriesList';
 import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
@@ -232,6 +237,7 @@ function App () {
 		const params = readLaunchParams();
 		installErrorReporter(params);
 		runProbe(params);
+		if (typeof params.probe === 'string' && typeof params.searchText === 'string') presetSearch(params.searchText);
 		const dev = devLogin(params);
 		if (dev && !live.current.session) {
 			login(normaliseServerUrl(dev.server), dev.username, dev.password).then((c) => {
@@ -391,7 +397,7 @@ function App () {
 	}, [route]);
 
 	const onTab = (name: Route['name']) => {
-		if (name === 'home' || name === 'library' || name === 'series' || name === 'settings') setStack(reset({name} as Route));
+		if (TABS.indexOf(name) !== -1) setStack(reset({name} as Route));
 	};
 	const onSettings = () => onTab('settings');
 	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
@@ -428,6 +434,56 @@ function App () {
 					onTab={onTab}
 					onSettings={onSettings}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+					onOpenCollections={(libraryId) => go({name: 'collections', libraryId}, 'collections')}
+				/>
+			)}
+			{route.name === 'search' && client && (
+				<Search
+					client={client}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onSettings={onSettings}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+					onOpenSeries={(libraryId, seriesId, seriesName, fromKey) => go({name: 'seriesDetail', libraryId, seriesId, seriesName}, fromKey)}
+					onOpenAuthor={(authorId, authorName, fromKey) => go({name: 'author', authorId, authorName}, fromKey)}
+					onOpenNarrator={(libraryId, name, fromKey) => go({name: 'books', title: name, source: {kind: 'narrator', libraryId, name}}, fromKey)}
+				/>
+			)}
+			{route.name === 'authors' && client && (
+				<Authors
+					client={client}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onSettings={onSettings}
+					onOpenAuthor={(authorId, authorName, fromKey) => go({name: 'author', authorId, authorName}, fromKey)}
+				/>
+			)}
+			{route.name === 'author' && client && (
+				<AuthorScreen
+					key={route.authorId}
+					client={client}
+					authorId={route.authorId}
+					authorName={route.authorName}
+					restoreKey={top.focusKey}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+				/>
+			)}
+			{route.name === 'collections' && client && (
+				<Collections
+					client={client}
+					libraryId={route.libraryId}
+					restoreKey={top.focusKey}
+					onOpen={(title, source, fromKey) => go({name: 'books', title, source}, fromKey)}
+				/>
+			)}
+			{route.name === 'books' && client && (
+				<BookList
+					key={JSON.stringify(route.source)}
+					client={client}
+					title={route.title}
+					source={route.source}
+					restoreKey={top.focusKey}
+					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 				/>
 			)}
 			{route.name === 'series' && client && (
@@ -463,6 +519,7 @@ function App () {
 					onPlay={(itemId, startAt) => openBook(engine, itemId, {fromKey: 'play', startAt})}
 					onShowPlayer={() => showPlayer('play')}
 					onOpenSeries={(libraryId, series, fromKey) => go({name: 'seriesDetail', libraryId, seriesId: series.id, seriesName: series.name, focusItemId: route.itemId}, fromKey)}
+					onOpenAuthor={(authorId, authorName, fromKey) => go({name: 'author', authorId, authorName}, fromKey)}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 				/>
 			)}

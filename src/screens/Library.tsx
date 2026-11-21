@@ -51,6 +51,7 @@ interface LibraryProps {
 	onTab: (name: Route['name']) => void;
 	onSettings: () => void;
 	onOpenTitle: (itemId: string, fromKey: string) => void;
+	onOpenCollections: (libraryId: string) => void;
 }
 
 export function toGridItem (client: AbsClient, item: LibraryItem, progress: MediaProgress | undefined): GridItem {
@@ -69,7 +70,7 @@ export function toGridItem (client: AbsClient, item: LibraryItem, progress: Medi
 	};
 }
 
-export default function Library ({client, restoreKey, onTab, onSettings, onOpenTitle}: LibraryProps) {
+export default function Library ({client, restoreKey, onTab, onSettings, onOpenTitle, onOpenCollections}: LibraryProps) {
 	const [libraries, setLibraries] = useState<LibraryInfo[] | null>(libsCache);
 	const [libraryId, setLibraryId] = useState<string | null>(cache ? cache.libraryId : null);
 	const [sort, setSort] = useState<SortId>(cache ? cache.sort : 'recent');
@@ -79,6 +80,7 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 	const [error, setError] = useState<AbsError | null>(null);
 	const [reload, setReload] = useState(0);
 	const loading = useRef(false);
+	const [lists, setLists] = useState(0);
 	const initialRow = cache ? cache.row : 0;
 
 	// Libraries, then the remembered (or first) book library.
@@ -126,6 +128,18 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		fetchPage(libraryId, sort, 0, false);
 	}, [libraryId, sort, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// Collections and playlists get a chip only when there are some.
+	useEffect(() => {
+		if (!libraryId) return undefined;
+		let cancelled = false;
+		Promise.all([client.collections(libraryId), client.playlists(libraryId)]).then(([c, p]) => {
+			if (!cancelled) setLists(c.length + p.length);
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, libraryId]);
+
 	const onNearEnd = () => {
 		if (libraryId && items.length < total) fetchPage(libraryId, sort, Math.floor(items.length / PAGE), true);
 	};
@@ -167,6 +181,11 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 					{total >= 0 && <span className="vf-muted vf-browse__count">{total + ' titles'}</span>}
 				</div>
 				<div className="vf-sorts" role="group" aria-label="Sort">
+					{lists > 0 && libraryId && (
+						<Button variant="chip" className="vf-sorts__lists" data-focus-key="collections" onClick={() => onOpenCollections(libraryId)}>
+							{'Collections · ' + lists}
+						</Button>
+					)}
 					<span className="vf-sorts__label">Sort</span>
 					{SORTS.map((s) => (
 						<Button

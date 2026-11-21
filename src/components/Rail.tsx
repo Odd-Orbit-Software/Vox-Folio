@@ -9,8 +9,10 @@ import type {IconName} from './controls';
 
 const TABS: {name: Route['name']; label: string; icon: IconName}[] = [
 	{name: 'home', label: 'Home', icon: 'home'},
+	{name: 'search', label: 'Search', icon: 'search'},
 	{name: 'library', label: 'Library', icon: 'library'},
-	{name: 'series', label: 'Series', icon: 'series'}
+	{name: 'series', label: 'Series', icon: 'series'},
+	{name: 'authors', label: 'Authors', icon: 'authors'}
 ];
 
 /** True when no focusable element sits to the left of `el` in the same row (vertically overlapping). */

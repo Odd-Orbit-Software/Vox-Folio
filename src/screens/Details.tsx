@@ -19,6 +19,7 @@ interface DetailsProps {
 	onPlay: (itemId: string, startAt?: number) => void;
 	onShowPlayer: () => void;
 	onOpenSeries: (libraryId: string, series: SeriesRef, fromKey: string) => void;
+	onOpenAuthor: (authorId: string, name: string, fromKey: string) => void;
 	onOpenTitle: (itemId: string, fromKey: string) => void;
 }
 
@@ -37,7 +38,7 @@ function firstSeries (item: LibraryItem): SeriesRef | null {
 	return s || null;
 }
 
-export default function Details ({client, itemId, player, autoplay, restoreKey, onToggleAutoplay, onPlay, onShowPlayer, onOpenSeries, onOpenTitle}: DetailsProps) {
+export default function Details ({client, itemId, player, autoplay, restoreKey, onToggleAutoplay, onPlay, onShowPlayer, onOpenSeries, onOpenAuthor, onOpenTitle}: DetailsProps) {
 	const [load, setLoad] = useState<Load>({state: 'loading'});
 	const [reload, setReload] = useState(0);
 	const [busy, setBusy] = useState(false);
@@ -111,17 +112,31 @@ export default function Details ({client, itemId, player, autoplay, restoreKey, 
 
 			{md && item && (
 				<div className="vf-details__info">
-					{data && data.series && (
-						<Button
-							variant="chip"
-							className="vf-details__series"
-							data-focus-key="series"
-							onClick={() => onOpenSeries(item.libraryId, data.series!, 'series')}
-						>
-							<Icon name="series" size={22} />
-							<span>{data.series.name + (data.series.sequence ? ' · ' + bookLabel(data.series.sequence) : '')}</span>
-						</Button>
-					)}
+					<div className="vf-details__links">
+						{data && data.series && (
+							<Button
+								variant="chip"
+								className="vf-details__series"
+								data-focus-key="series"
+								onClick={() => onOpenSeries(item.libraryId, data.series!, 'series')}
+							>
+								<Icon name="series" size={22} />
+								<span>{data.series.name + (data.series.sequence ? ' · ' + bookLabel(data.series.sequence) : '')}</span>
+							</Button>
+						)}
+						{(md.authors || []).map((a) => (
+							<Button
+								key={a.id}
+								variant="chip"
+								className="vf-details__series"
+								data-focus-key={'author:' + a.id}
+								onClick={() => onOpenAuthor(a.id, a.name, 'author:' + a.id)}
+							>
+								<Icon name="authors" size={22} />
+								<span>{a.name}</span>
+							</Button>
+						))}
+					</div>
 					<h1 className="vf-details__title">{md.title}</h1>
 					<div className="vf-details__byline">{md.authorName}{md.narratorName ? ' · read by ' + md.narratorName : ''}</div>
 					<div className="vf-details__meta">

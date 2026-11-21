@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Series, SyncPayload} from './types';
+import type {Author, AuthorDetail, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -231,6 +231,54 @@ export class AbsClient {
 		const filter = 'series.' + window.btoa(seriesId);
 		const q = 'filter=' + encodeURIComponent(filter) + '&sort=' + encodeURIComponent('media.metadata.series.sequence') + '&limit=500&minified=0';
 		const page = await this.request<Page<LibraryItem>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/items?' + q);
+		return page && page.results || [];
+	}
+
+	search (libraryId: string, query: string): Promise<SearchResults> {
+		return this.request<SearchResults>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/search?limit=12&q=' + encodeURIComponent(query));
+	}
+
+	/** Audiobookshelf's personalised Home shelves (continue series, recently added, discover…). */
+	async shelves (libraryId: string): Promise<Shelf[]> {
+		const data = await this.request<Shelf[]>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/personalized?limit=12');
+		return data || [];
+	}
+
+	async authors (libraryId: string): Promise<Author[]> {
+		const data = await this.request<{authors: Author[]}>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/authors');
+		return (data && data.authors || []).filter((a) => (a.numBooks || 0) > 0);
+	}
+
+	author (authorId: string): Promise<AuthorDetail> {
+		return this.request<AuthorDetail>('GET', '/api/authors/' + encodeURIComponent(authorId) + '?include=items,series', undefined, 'That author');
+	}
+
+	authorImageUrl (authorId: string, width = 400): string {
+		return this.authorisedUrl('/api/authors/' + encodeURIComponent(authorId) + '/image?width=' + width + '&format=jpeg');
+	}
+
+	async collections (libraryId: string): Promise<Collection[]> {
+		const data = await this.request<Page<Collection>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/collections?limit=100');
+		return data && data.results || [];
+	}
+
+	async playlists (libraryId: string): Promise<Playlist[]> {
+		const data = await this.request<Page<Playlist>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/playlists?limit=100');
+		return data && data.results || [];
+	}
+
+	collection (id: string): Promise<Collection> {
+		return this.request<Collection>('GET', '/api/collections/' + encodeURIComponent(id), undefined, 'That collection');
+	}
+
+	playlist (id: string): Promise<Playlist> {
+		return this.request<Playlist>('GET', '/api/playlists/' + encodeURIComponent(id), undefined, 'That playlist');
+	}
+
+	/** Books read by a narrator (Audiobookshelf filters take base64-encoded values). */
+	async narratorBooks (libraryId: string, narrator: string): Promise<LibraryItem[]> {
+		const filter = 'narrators.' + window.btoa(unescape(encodeURIComponent(narrator)));
+		const page = await this.libraryItems(libraryId, {sort: 'media.metadata.title', page: 0, limit: 200, filter});
 		return page && page.results || [];
 	}
 

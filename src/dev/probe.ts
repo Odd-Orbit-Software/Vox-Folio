@@ -115,7 +115,12 @@ export function replayKeys (params: LaunchParams, onDone?: () => void): void {
 		}
 		const step = steps[i++];
 		if (step !== 'wait' && KEY_NAMES[step]) press(KEY_NAMES[step]);
-		window.setTimeout(next, step === 'wait' ? 2500 : 700);
+		window.setTimeout(() => {
+			// Where focus landed, so key-driven tests can be read without screenshots.
+			const el = document.activeElement as HTMLElement | null;
+			report({kind: 'key', key: step, focus: el ? (el.getAttribute('data-focus-key') || el.getAttribute('aria-label') || el.className) : null});
+			next();
+		}, step === 'wait' ? 2500 : 700);
 	};
 	window.setTimeout(next, 1500);
 }

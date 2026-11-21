@@ -41,6 +41,8 @@ export interface BookMetadata {
 	title: string;
 	subtitle?: string | null;
 	authorName?: string;
+	/** Present on expanded items. */
+	authors?: {id: string; name: string}[];
 	narratorName?: string;
 	/** "Series #seq", comma-separated when a book is in several series (minified listings). */
 	seriesName?: string;
@@ -118,4 +120,45 @@ export interface SyncPayload {
 	/** Seconds actually spent listening since the previous sync. */
 	timeListening: number;
 	duration: number;
+}
+
+export interface Author {
+	id: string;
+	name: string;
+	numBooks?: number;
+	imagePath?: string | null;
+	description?: string | null;
+}
+
+export interface AuthorDetail extends Author {
+	libraryItems?: LibraryItem[];
+	series?: {id: string; name: string; items?: LibraryItem[]}[];
+}
+
+export interface SearchResults {
+	book: {libraryItem: LibraryItem}[];
+	series: {series: Series; books: LibraryItem[]}[];
+	authors: Author[];
+	narrators: {name: string; numBooks: number}[];
+}
+
+/** One of Audiobookshelf's personalised Home shelves. */
+export interface Shelf {
+	id: string;
+	label?: string;
+	type: 'book' | 'series' | 'authors' | 'podcast' | 'episode';
+	entities: LibraryItem[];
+}
+
+export interface Collection {
+	id: string;
+	name: string;
+	description?: string | null;
+	books?: LibraryItem[];
+}
+
+export interface Playlist {
+	id: string;
+	name: string;
+	items?: {libraryItemId: string; libraryItem?: LibraryItem}[];
 }
