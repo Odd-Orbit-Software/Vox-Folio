@@ -36,3 +36,16 @@ Polaris already puts the item ID into `params.abs` and currently points audioboo
 4. On a normal exit or a title change, flush the latest position and close the session. On a lost connection, show the unsynced state. Before writing a delayed update after reconnecting, check whether another device has already advanced the book.
 
 Verify response fields and session behaviour against the installed server during the first playback test. [Audiobookshelf API reference](https://api.audiobookshelf.org/)
+
+## Verified on the TV (2026-11-21)
+
+Tested on the rooted LG TV (Chromium 79) against Audiobookshelf 2.37.2 with a test account. "The phone" was simulated by a second Audiobookshelf session from a PC (`tools/abs-simulate-phone.sh`), not Absorb itself.
+
+- A cold launch with `{"abs": id}` before sign-in carried the ID through sign-in and opened the book at the server position.
+- Relaunching with the same ID brought the player forward without restarting the stream. When paused, the player first takes any newer position another device has saved. Relaunching with a different ID saved the old book's position, then switched.
+- Phone → TV → phone: the TV paused at 30:01, the phone saved 40:00, and the relaunch picked up at 40:00. The TV then listened 9 s and paused, and the server held 40:09.
+- In a 69-file MP3 book, playback continued across a file boundary into the next chapter, and syncs kept the book position.
+- An unknown ID shows "We couldn't open that book" with Go to Home.
+- Speed: the TV mutes audio whenever an element's `playbackRate` isn't 1. Changing the rate through `luna://com.webos.media/setPlayRate` with `audioOutput: true` keeps the sound. This was confirmed by ear at 1.15× and 1.25×, and book time advanced at about 1.25×.
+
+Still to run with the real Absorb app, as the delivery plan describes: a single M4B with embedded chapters, rates above 2×, a network interruption, and the Polaris Continue card itself.

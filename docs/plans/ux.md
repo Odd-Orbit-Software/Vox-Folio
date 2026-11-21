@@ -52,7 +52,7 @@ On the player, Up/Down moves between rows: transport, then scrubber, then second
 | Series | Ordered list showing sequence numbers, including 2.5, plus each book's progress and finished state. | The book you came from |
 | Player | Cover, title, chapter, book position, scrubber with chapter ticks, transport, speed, autoplay. | Play/Pause |
 | Chapters panel | Slides over the right third of the player. The current chapter is marked. | Current chapter |
-| Speed panel | Steps from 0.5× to 3.0× in 0.05× increments, with presets. | Current rate |
+| Speed panel | Steps from 0.5× to 2.0× in 0.05× increments, with presets. Rate changes go through the TV media service so the sound stays on. | Current rate |
 | Up Next | Shows 15s before the end when autoplay is on: the next cover, a countdown, and Play now or Not now. | Play now |
 | Screensaver | A floating cover, title and percentage of the book. Any key wakes it without acting on that key. | — |
 | Errors | Title unavailable, connection lost (shows unsynced time), server unreachable. | Retry or Home |

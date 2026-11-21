@@ -1,0 +1,10 @@
+node_modules
+coverage
+build
+dist
+*.ipk
+.DS_Store
+npm-debug.log
+.abs-test.env
+.env.*.local
+tv.conf
