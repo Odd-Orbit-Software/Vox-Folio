@@ -1,3 +1,4 @@
+import mark from '../assets/vox-folio-mark.svg';
 import type {PlayerState} from '../player/engine';
 import {Clock} from './Clock';
 import {Cover} from './controls';
@@ -33,7 +34,10 @@ export function Screensaver ({player}: {player: PlayerState}) {
 					) : (
 						<div className="vf-saver__card vf-saver__card--idle">
 							<Clock className="vf-saver__clock vf-saver__clock--big" />
-							<div className="vf-wordmark">Vox Folio</div>
+							<div className="vf-lockup vf-lockup--small">
+								<img className="vf-logo-mark vf-logo-mark--small" src={mark} alt="" />
+								<div className="vf-wordmark">Vox Folio</div>
+							</div>
 						</div>
 					)}
 				</div>

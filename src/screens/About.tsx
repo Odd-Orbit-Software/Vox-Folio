@@ -1,5 +1,6 @@
 import type {Credentials} from '../abs/client';
 import logo from '../assets/odd-orbit-logo.webp';
+import mark from '../assets/vox-folio-mark.svg';
 import orbi from '../assets/orbi-sitting.webp';
 import {Button, Icon} from '../components/controls';
 import {ScreenContainer} from '../components/ScreenContainer';
@@ -16,7 +17,10 @@ export default function About ({version, creds, onBack, onSignOut}: AboutProps) 
 		<ScreenContainer id="about" className="vf-about">
 			<div className="vf-about__app">
 				<span className="vf-hint"><Icon name="back" size={24} />Back</span>
-				<div className="vf-wordmark vf-wordmark--hero">Vox Folio</div>
+				<div className="vf-lockup">
+					<img className="vf-logo-mark vf-logo-mark--inline" src={mark} alt="" aria-hidden="true" />
+					<div className="vf-wordmark vf-wordmark--hero">Vox Folio</div>
+				</div>
 				<p className="vf-about__lede">An Audiobookshelf player for LG TVs.</p>
 				<dl className="vf-facts">
 					<dt>Version</dt>

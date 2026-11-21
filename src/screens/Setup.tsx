@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 
 import {AbsError, login, normaliseServerUrl, ping} from '../abs/client';
+import mark from '../assets/vox-folio-mark.svg';
 import type {Credentials} from '../abs/client';
 import {Button, Icon, TextField} from '../components/controls';
 import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
@@ -70,6 +71,7 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 	return (
 		<ScreenContainer id="setup" className="vf-setup">
 			<div className="vf-setup__intro">
+				<img className="vf-logo-mark" src={mark} alt="" aria-hidden="true" />
 				<div className="vf-wordmark vf-wordmark--hero">Vox Folio</div>
 				<p className="vf-setup__lede">Your Audiobookshelf library, from the sofa. Sign in once and your place follows you between phone and TV.</p>
 				{pendingItemId && (

@@ -54,3 +54,8 @@ declare module '*.woff2' {
 }
 
 declare const ENACT_PACK_ISOMORPHIC: boolean;
+
+declare module '*.svg' {
+  const src: string;
+  export default src;
+}

@@ -2,6 +2,7 @@ import Spotlight from '@enact/spotlight';
 import {useEffect, useRef} from 'react';
 
 import type {Route} from '../app/routes';
+import mark from '../assets/vox-folio-mark.svg';
 import {Keys} from '../platform/webos';
 import {Button, Icon} from './controls';
 import type {IconName} from './controls';
@@ -50,7 +51,7 @@ export function Rail ({active, onTab, onAbout}: {active: Route['name']; onTab: (
 
 	return (
 		<nav className="vf-rail" aria-label="Main" ref={nav}>
-			<div className="vf-rail__mark" aria-hidden="true">V</div>
+			<img className="vf-rail__mark" src={mark} alt="" aria-hidden="true" />
 			<div className="vf-rail__tabs">
 				{TABS.map((t) => (
 					<Button
