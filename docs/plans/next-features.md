@@ -20,7 +20,7 @@ Step through TV keys one at a time and log focus. Don't send long blind key sequ
 | A | Autoplay toggle in the player; mark an episode played/unplayed; remove from Continue Listening | 0.3.1 | done (committed on `features`) |
 | B | Library filters (progress, genre, tag, narrator, language) | 0.4.0 | done (committed on `features`) |
 | C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | done (committed on `features`) |
-| D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | todo |
+| D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | done (committed on `features`) |
 | E | Live progress from the server (socket) | 0.7.0 | todo |
 | F | Year in Review | 0.8.0 | todo |
 
@@ -117,6 +117,39 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
 - Shelves to add: "Listen again", "Discover", "Recent series", each with a Settings switch.
 - Settings scan: list anything that should be in Settings but isn't.
 - Notes:
+  - Built:
+    - `settings.hiddenHomeRows` and `HOME_ROWS` (in progress, continue series, recently added, listen again, discover, recent series, new episodes ★). All are shown by default.
+    - Home adds the Listen again, Discover and Recent series shelves. Recent series tiles open the series page.
+    - The Settings left column scrolls (`.vf-settings__scroll` / `__column`) and is split into Playback, Home rows and Extras sections, with Account on the right.
+  - Settings scan, added:
+    - Book speed and Podcast speed ★ (the speeds were stored but not settable; the roadmap promised a default speed). Changing one applies straight away if that kind is playing.
+    - Home rows.
+    - The Autoplay hint now covers playlists.
+  - Settings scan, considered and not added:
+    - A screensaver delay: the TV decides when the screensaver starts.
+    - A clock format setting: it follows the TV.
+    - A library choice: that's the Library chip.
+    - A separate podcast autoplay: one switch is simpler.
+    - Sync interval and Up Next countdown: not useful for listeners.
+  - TV-tested: Settings scrolls through all sections, Home shows the new rows, and Recent series opens Bobiverse.
+  - UX review (impeccable; detector clean). Fixes applied:
+    - A mask fade on the clipped column, with the offset clamped.
+    - Speed comes first in Playback.
+    - Left/Right step values (`onStep` and `stepChoice`; `data-own-left` lets the Rail's Left handler skip). At the end of the range, focus moves on.
+    - Off rows are dimmed.
+    - Defaults hide Listen again and New series, and New episodes moves up.
+    - "Recent series" is renamed "New series", and one-book series are filtered out.
+    - A "Choose Home rows" chip at the bottom of Home opens Settings focused on the Home rows section.
+    - The "Extras" group is renamed "Screensaver and stats".
+    - TV-verified, then claude-test-2's book speed was put back to 1.25×. The speed key is per TV, not per profile.
+  - Further settings the review suggested (for the user to decide; not built):
+    - Turn the screen off while listening (webOS screen-off, OLED care).
+    - Text size.
+    - Reduce motion.
+    - Reorder or reset Home rows.
+    - Sleep fade length.
+    - Time left at the current speed versus real time.
+    - Diagnostics (server version, clear cache).
 
 ## E. Live progress
 

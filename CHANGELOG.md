@@ -3,6 +3,18 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.6.0
+
+**Choose your Home rows**
+- New rows on Home: Discover (books you haven't started), Listen again, and New series. Listen again and New series start hidden.
+- Settings has a Home rows section to show or hide each row. "Choose Home rows" at the bottom of Home goes straight there.
+- New episodes now sits just below In progress.
+
+**Settings**
+- Book speed and Podcast speed ★ can be set in Settings, and a change applies at once.
+- Left and Right step a value up or down (speeds, skip lengths, sleep timer). OK still steps forward.
+- Settings is grouped into Playback, Home rows, and Screensaver and stats, and the list scrolls with soft edges. Switched-off rows are dimmed.
+
 ## 0.5.0
 
 **Playlists play in order**

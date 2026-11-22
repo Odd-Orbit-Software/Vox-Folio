@@ -6,7 +6,7 @@ import appinfo from '../../webos-meta/appinfo.json';
 import {AbsClient, login, normaliseServerUrl, progressKey} from '../abs/client';
 import type {Credentials} from '../abs/client';
 import type {Bookmark} from '../abs/types';
-import {deviceId} from '../abs/store';
+import {deviceId, savePlaybackRate} from '../abs/store';
 import {IdleWatcher} from '../app/idle';
 import {decideLaunch} from '../app/launch';
 import {activeProfile, addProfile, displayName, loadProfiles, removeProfile, saveProfiles, setActive, updateCreds} from '../app/profiles';
@@ -714,6 +714,8 @@ function App () {
 					onTab={onTab}
 					onSettings={onSettings}
 					onToast={pushToast}
+					onOpenSeries={(libraryId, seriesId, seriesName, fromKey) => go({name: 'seriesDetail', libraryId, seriesId, seriesName}, fromKey)}
+					onCustomise={() => setStack(reset({name: 'settings'}).map((e) => ({...e, focusKey: 'home:in-progress'})))}
 				/>
 			)}
 			{route.name === 'library' && client && (
@@ -870,6 +872,12 @@ function App () {
 					onAbout={() => go({name: 'about'}, 'about')}
 					onSignOut={() => signOut('')}
 					onStats={() => go({name: 'stats'}, 'stats')}
+					onSpeed={(kind, rate) => {
+						savePlaybackRate(rate, kind);
+						// Apply it now when that kind is loaded.
+						const st = engine ? engine.getState() : null;
+						if (engine && st && st.itemId && (st.episodeId ? 'podcast' : 'book') === kind) engine.setRate(rate);
+					}}
 				/>
 			)}
 			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} />}

@@ -72,6 +72,9 @@ export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab
 			const current = document.activeElement;
 			const screen = nav.current.parentElement;
 			if (!current || !screen || nav.current.contains(current) || !screen.contains(current)) return;
+			// Controls that use Left themselves (a settings value) step first; at their end, Spotlight
+			// still finds the rail.
+			if ((current as HTMLElement).hasAttribute('data-own-left')) return;
 			if (!isLeftmostInRow(current, screen)) return;
 			const target = nav.current.querySelector('.vf-rail__btn.is-active') || nav.current.querySelector('.vf-rail__btn');
 			if (target && Spotlight.focus(target as unknown as string)) {

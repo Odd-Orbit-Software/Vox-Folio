@@ -7,6 +7,8 @@ import type {LibraryItem, MediaProgress, PodcastEpisode, Shelf} from '../abs/typ
 import {episodeDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
+import {homeRowShown, useSettings} from '../app/settings';
+import type {HomeRowId} from '../app/settings';
 import {Button, Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
 import {Rail} from '../components/Rail';
@@ -33,6 +35,9 @@ interface HomeProps {
 	onTab: (name: Route['name']) => void;
 	onSettings: () => void;
 	onToast: (text: string) => void;
+	onOpenSeries: (libraryId: string, seriesId: string, name: string, fromKey: string) => void;
+	/** Settings, at the Home rows section. */
+	onCustomise: () => void;
 }
 
 interface Entry {
@@ -77,10 +82,26 @@ function writeCache (client: AbsClient, patch: Partial<HomeCache>): void {
 }
 
 /** Audiobookshelf's own Home shelves we show, in order, with our labels. */
-const SHELVES: {id: string; label: string; prefix: string}[] = [
+const SHELVES: {id: HomeRowId; label: string; prefix: string}[] = [
 	{id: 'continue-series', label: 'Continue series', prefix: 'next'},
-	{id: 'recently-added', label: 'Recently added', prefix: 'new'}
+	{id: 'recently-added', label: 'Recently added', prefix: 'new'},
+	{id: 'discover', label: 'Discover', prefix: 'disc'},
+	{id: 'listen-again', label: 'Listen again', prefix: 'again'},
+	{id: 'recent-series', label: 'New series', prefix: 'series'}
 ];
+
+/** A series tile for the Recent series row: its first book's cover and how many books. */
+function seriesTile (client: AbsClient, sr: {id: string; name: string; books?: LibraryItem[]}): GridItem {
+	const books = sr.books || [];
+	const first = books[0];
+	return {
+		key: 'series:' + sr.id,
+		coverUrl: first && first.media.coverPath ? client.coverUrl(first.id, 480) : '',
+		title: sr.name,
+		subtitle: books.length + (books.length === 1 ? ' book' : ' books'),
+		percent: null
+	};
+}
 
 /** The progress key for an entry: item, or item/episode. */
 function entryKey (e: Entry): string {
@@ -118,8 +139,9 @@ function percent (e: Entry): number {
 	return e.progress ? Math.round(e.progress.progress * 100) : 0;
 }
 
-export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings, onToast}: HomeProps) {
+export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings, onToast, onOpenSeries, onCustomise}: HomeProps) {
 	const [cached] = useState(() => readCache(client));
+	const settings = useSettings();
 	const [load, setLoad] = useState<Load>(() => (cached && cached.entries.length
 		? {state: 'ready', entries: cached.entries, progress: cached.progress}
 		: {state: 'loading'}));
@@ -164,9 +186,13 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 
 	// The server's shelves are extras: Home works without them.
 	const [shelves, setShelves] = useState<Shelf[]>(() => (cached ? cached.shelves : []));
+	const [libraryId, setLibraryId] = useState<string | null>(null);
 	useEffect(() => {
 		let cancelled = false;
-		resolveLibraryId(client).then((id) => (id ? client.shelves(id) : [])).then((list) => {
+		resolveLibraryId(client).then((id) => {
+			if (!cancelled) setLibraryId(id);
+			return id ? client.shelves(id) : [];
+		}).then((list) => {
 			if (cancelled) return;
 			setShelves(list);
 			writeCache(client, {shelves: list.filter((sh) => SHELVES.some((d) => d.id === sh.id))});
@@ -301,11 +327,23 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	const heroEp = hero ? hero.episode : undefined;
 	const heroKey = hero ? progressKey(hero.item.id, heroEp ? heroEp.id : null) : '';
 	const heroIsLoaded = Boolean(hero && player.itemId && progressKey(player.itemId, player.episodeId) === heroKey);
-	const extraRows = SHELVES.map((def) => {
-		const shelf = shelves.filter((sh) => sh.id === def.id && sh.type === 'book')[0];
-		const items: GridItem[] = shelf ? shelf.entities.map((item) => ({...toGridItem(client, item, progress[item.id]), key: def.prefix + ':' + item.id})) : [];
+	const extraRows = SHELVES.filter((def) => homeRowShown(settings, def.id)).map((def) => {
+		const shelf = shelves.filter((sh) => sh.id === def.id && (sh.type === 'book' || sh.type === 'series'))[0];
+		const items: GridItem[] = !shelf ? [] : shelf.type === 'series'
+			// A one-book "series" isn't much of a series to browse.
+			? (shelf.entities as unknown as {id: string; name: string; books?: LibraryItem[]}[]).filter((sr) => (sr.books || []).length > 1).map((sr) => seriesTile(client, sr))
+			: shelf.entities.map((item) => ({...toGridItem(client, item, progress[item.id]), key: def.prefix + ':' + item.id}));
 		return {...def, items};
 	}).filter((r) => r.items.length > 0);
+	const showInProgress = homeRowShown(settings, 'in-progress');
+	const showNewEpisodes = homeRowShown(settings, 'new-episodes');
+	const openShelfTile = (r: {prefix: string}, g: GridItem) => {
+		if (g.key.indexOf('series:') === 0) {
+			if (libraryId) onOpenSeries(libraryId, g.key.slice(7), g.title, g.key);
+		} else {
+			onDetails(g.key.slice(r.prefix.length + 1), g.key);
+		}
+	};
 	const nowPlaying = player.itemId && player.status !== 'error' ? player : null;
 
 	return (
@@ -405,7 +443,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 					</section>
 				)}
 
-				{rest.length > 0 && (
+				{showInProgress && rest.length > 0 && (
 					<CoverRow
 						title="In progress"
 						items={restItems}
@@ -416,11 +454,19 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 						}}}
 					/>
 				)}
+				{showNewEpisodes && newEpisodes.length > 0 && (
+					<CoverRow title="New episodes" items={newEpisodes} defaultFocus={!hero && !nowPlaying} onSelect={openTile} />
+				)}
 				{extraRows.map((r, i) => (
-					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && i === 0} onSelect={(g) => onDetails(g.key.slice(r.prefix.length + 1), g.key)} />
+					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && !(showNewEpisodes && newEpisodes.length) && i === 0} onSelect={(g) => openShelfTile(r, g)} />
 				))}
-				{newEpisodes.length > 0 && (
-					<CoverRow title="New episodes" items={newEpisodes} defaultFocus={!hero && !nowPlaying && !extraRows.length} onSelect={openTile} />
+
+				{load.state === 'ready' && (
+					<div className="vf-home__customise" data-vrow>
+						<Button variant="chip" data-focus-key="customise" onClick={onCustomise}>
+							<Icon name="settings" size={22} />Choose Home rows
+						</Button>
+					</div>
 				)}
 			</VScroll>
 			</div>

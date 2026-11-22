@@ -17,6 +17,29 @@ export interface Settings {
 	seriesAutoplay: boolean;
 	/** ★ Dim the screensaver and slow its drift late at night. */
 	nightMode: boolean;
+	/** Home rows the listener has switched off (the Continue listening card always shows). */
+	hiddenHomeRows: HomeRowId[];
+}
+
+export type HomeRowId = 'in-progress' | 'continue-series' | 'recently-added' | 'listen-again' | 'discover' | 'recent-series' | 'new-episodes';
+
+/** Home's rows in the order they appear, with what each shows. */
+export const HOME_ROWS: {id: HomeRowId; label: string; hint: string; premium?: boolean}[] = [
+	{id: 'in-progress', label: 'In progress', hint: 'Other books and episodes you\'re partway through'},
+	{id: 'new-episodes', label: 'New episodes ★', hint: 'The latest from your podcasts', premium: true},
+	{id: 'continue-series', label: 'Continue series', hint: 'The next book in series you\'ve started'},
+	{id: 'recently-added', label: 'Recently added', hint: 'New to the library'},
+	{id: 'discover', label: 'Discover', hint: 'Books you haven\'t started, picked at random'},
+	{id: 'listen-again', label: 'Listen again', hint: 'Books you finished a while ago'},
+	{id: 'recent-series', label: 'New series', hint: 'Series added to the library lately'}
+];
+
+export function homeRowShown (settings: Settings, id: HomeRowId): boolean {
+	return settings.hiddenHomeRows.indexOf(id) === -1;
+}
+
+export function toggleHomeRow (settings: Settings, id: HomeRowId): HomeRowId[] {
+	return homeRowShown(settings, id) ? settings.hiddenHomeRows.concat(id) : settings.hiddenHomeRows.filter((r) => r !== id);
 }
 
 export const SKIP_CHOICES = [10, 15, 30, 45, 60];
@@ -36,7 +59,9 @@ const defaults: Settings = {
 	smartRewind: true,
 	sleepDefault: 30,
 	seriesAutoplay: true,
-	nightMode: true
+	nightMode: true,
+	// Home stays short until the listener asks for more.
+	hiddenHomeRows: ['listen-again', 'recent-series']
 };
 
 function load (): Settings {
@@ -54,6 +79,7 @@ function load (): Settings {
 	if (SKIP_CHOICES.indexOf(merged.skipBack) === -1) merged.skipBack = defaults.skipBack;
 	if (SKIP_CHOICES.indexOf(merged.skipForward) === -1) merged.skipForward = defaults.skipForward;
 	if (SLEEP_CHOICES.indexOf(merged.sleepDefault) === -1) merged.sleepDefault = defaults.sleepDefault;
+	if (!Array.isArray(merged.hiddenHomeRows)) merged.hiddenHomeRows = defaults.hiddenHomeRows.slice();
 	return merged;
 }
 
@@ -94,6 +120,13 @@ export function subscribeSettings (fn: () => void): () => void {
 
 export function useSettings (): Settings {
 	return useSyncExternalStore(subscribeSettings, getSettings);
+}
+
+/** The neighbouring value in a list of choices, or null at either end (Left/Right on a settings row). */
+export function stepChoice<T> (choices: T[], value: T, dir: 1 | -1): T | null {
+	const i = choices.indexOf(value);
+	const j = i === -1 ? 0 : i + dir;
+	return j >= 0 && j < choices.length ? choices[j] : null;
 }
 
 /** The next value in a list of choices, wrapping round (OK on a settings row). */

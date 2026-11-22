@@ -1955,7 +1955,28 @@
 	min-width: 0;
 }
 
-.vf-settings__group + .vf-settings__group {
+/* The setting rows slide inside a clipped column, so the list can be longer than the screen. */
+.vf-settings__scroll {
+	flex: 1;
+	min-width: 0;
+	height: 860px;
+	overflow: hidden;
+	/* Rows fade at the clipped edges rather than being cut through. */
+	-webkit-mask-image: linear-gradient(transparent, #000 40px, #000 calc(100% - 56px), transparent);
+	/* Room for the focused row's ring. */
+	padding: 10px;
+	margin: -10px;
+}
+
+.vf-settings__column {
+	transition: transform 220ms ease-out;
+}
+
+.vf-settings__column > .vf-settings__group + .vf-settings__group {
+	margin-top: 40px;
+}
+
+.vf-settings__account {
 	margin-left: 64px;
 	flex: 0 0 560px;
 }
@@ -3055,4 +3076,32 @@
 
 .vf-player__queue {
 	color: var(--vf-brass);
+}
+
+.vf-setting.is-off .vf-setting__label,
+.vf-setting.is-off .vf-setting__value {
+	color: var(--vf-faint);
+}
+
+.vf-setting.is-off:focus .vf-setting__label,
+.vf-setting.is-off:focus .vf-setting__value {
+	color: var(--vf-muted);
+}
+
+.vf-setting__value > svg:first-child:not(:last-child) {
+	margin-right: 8px;
+}
+
+.vf-settings__note {
+	margin: -8px 0 16px;
+	font-size: 20px;
+	color: var(--vf-faint);
+}
+
+.vf-home__customise {
+	padding: 8px 0 40px;
+}
+
+.vf-home__customise svg {
+	margin-right: 10px;
 }
