@@ -3,6 +3,14 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.4.0
+
+**Library filters**
+- Filter the Library by progress (not started, in progress, finished), genre, narrator, tag or language, from the Filter chip beside Sort.
+- Genres that the server saved as one long list ("Adventure, Humorous, Space Exploration") appear as separate genres, and spellings of a language ("eng", "English") are merged.
+- The title count says how much is showing ("7 of 181 titles"), and the chip shows the filter in force. Red on the chip, or in the panel, shows all books again.
+- In long lists such as narrators, Channel up and down jump eight at a time.
+
 ## 0.3.1
 
 - The player has an Autoplay switch beside Sleep, for books in a series and for podcast episodes.

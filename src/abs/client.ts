@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, PodcastSearchResults, SearchResults, Series, Shelf, SyncPayload} from './types';
+import type {Author, AuthorDetail, Bookmark, FilterData, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, PodcastSearchResults, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -287,6 +287,12 @@ export class AbsClient {
 		];
 		if (opts.filter) q.push('filter=' + encodeURIComponent(opts.filter));
 		return this.request<Page<LibraryItem>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/items?' + q.join('&'));
+	}
+
+	/** The values a library can be filtered by (genres, tags, narrators, languages). */
+	async filterData (libraryId: string): Promise<FilterData> {
+		const d = await this.request<Partial<FilterData>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/filterdata');
+		return {genres: d && d.genres || [], tags: d && d.tags || [], narrators: d && d.narrators || [], languages: d && d.languages || [], bookCount: d && d.bookCount || 0};
 	}
 
 	/** A library's series, by name. Each includes its books in series order. */

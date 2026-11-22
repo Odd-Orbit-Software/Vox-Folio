@@ -215,3 +215,12 @@ export interface ListeningStats {
 	today: number;
 }
 
+/** What a library can be filtered by (from /filterdata). */
+export interface FilterData {
+	genres: string[];
+	tags: string[];
+	narrators: string[];
+	languages: string[];
+	/** Books in the library (unfiltered). */
+	bookCount?: number;
+}

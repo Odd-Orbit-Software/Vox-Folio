@@ -18,7 +18,7 @@ Step through TV keys one at a time and log focus. Don't send long blind key sequ
 | # | Feature | Version | Status |
 | --- | --- | --- | --- |
 | A | Autoplay toggle in the player; mark an episode played/unplayed; remove from Continue Listening | 0.3.1 | done (committed on `features`) |
-| B | Library filters (progress, genre, tag, narrator, language) | 0.4.0 | todo |
+| B | Library filters (progress, genre, tag, narrator, language) | 0.4.0 | done (committed on `features`) |
 | C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | todo |
 | D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | todo |
 | E | Live progress from the server (socket) | 0.7.0 | todo |
@@ -58,6 +58,24 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
 - Filter strings: `progress.<b64>` with the values finished, not-started, in-progress and not-finished; `genres.<b64>`, `tags.<b64>`, `narrators.<b64>` and `languages.<b64>`.
 - UI: a "Filter" chip next to Sort opens a panel.
 - Notes:
+  - Built:
+    - `src/app/filters.ts` (+ test).
+    - `src/components/FilterPanel.tsx`: tabs for Progress, Genre, Narrator, Tag and Language, each list with its values. Back closes the panel and focus returns to the chip.
+    - `Library.tsx` keeps the filter in its cache. It shows "No books match" with a Show all books button.
+  - This server saves genres as comma-joined strings ("Adventure, Humorous"), and languages as "eng", "English" and "english". The values are tidied into single choices with `sources`. A choice with several sources fetches each one (limit 500), merges them, and sorts on the client (`sortItems`). "Audiobook" is dropped from genres.
+  - TV-tested on claude-test-2: the Adventure genre returned 7 titles, the In progress filter returned 2, and Back closes the panel.
+  - UX review (impeccable; the detector came back clean). Fixes applied:
+    - The active filter chip uses a paper fill like the selected sort, and the count reads "N of M titles" (from filterdata's bookCount, now loaded with the library).
+    - CH+/− page by 8, with an "17 of 141" readout.
+    - Red clears the filter from the chip or the panel. The panel shows "Showing X · ● Show all books".
+    - "Not finished" is dropped.
+    - The empty-state copy depends on the filter.
+    - The icon is now a funnel, and the label is truncated with an ellipsis.
+  - Left for later:
+    - Combining filters.
+    - Counts per value.
+    - An A–Z jump.
+    - Genres and narrators as cover shelves.
 
 ## C. Playlist playback
 

@@ -1,16 +1,21 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
-import type {Library as LibraryInfo, LibraryItem, MediaProgress} from '../abs/types';
+import type {FilterData, Library as LibraryInfo, LibraryItem, MediaProgress} from '../abs/types';
 import {loadLibraryId, saveLibraryId} from '../abs/store';
+import {filterLabel, filterParam, noMatchText, sameFilter, sourcesOf} from '../app/filters';
+import type {LibraryFilter} from '../app/filters';
 import type {Route} from '../app/routes';
 import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
-import {Button} from '../components/controls';
+import {Button, Icon} from '../components/controls';
+import {FilterPanel} from '../components/FilterPanel';
 import {Rail} from '../components/Rail';
 import {ErrorPanel} from '../components/ErrorPanel';
-import {ScreenContainer} from '../components/ScreenContainer';
+import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
 import {formatDuration} from '../player/timeline';
+import {Keys} from '../platform/webos';
 
 const SORTS = [
 	{id: 'recent', label: 'Recently added', key: 'addedAt', desc: true},
@@ -24,6 +29,7 @@ const PAGE = 60;
 interface Loaded {
 	libraryId: string;
 	sort: SortId;
+	filter: LibraryFilter | null;
 	items: LibraryItem[];
 	total: number;
 	row: number;
@@ -55,6 +61,17 @@ interface LibraryProps {
 	onOpenCollections: (libraryId: string) => void;
 }
 
+/** Sort merged results the way the server would for the chosen sort. */
+function sortItems (items: LibraryItem[], sortId: SortId): LibraryItem[] {
+	const md = (i: LibraryItem) => i.media.metadata as {title?: string; titleIgnorePrefix?: string; authorNameLF?: string; authorName?: string};
+	const text = (a: string | undefined, b: string | undefined) => (a || '').localeCompare(b || '');
+	const out = items.slice();
+	if (sortId === 'recent') out.sort((a, b) => ((b as {addedAt?: number}).addedAt || 0) - ((a as {addedAt?: number}).addedAt || 0));
+	else if (sortId === 'title') out.sort((a, b) => text(md(a).titleIgnorePrefix || md(a).title, md(b).titleIgnorePrefix || md(b).title));
+	else out.sort((a, b) => text(md(a).authorNameLF || md(a).authorName, md(b).authorNameLF || md(b).authorName));
+	return out;
+}
+
 export function toGridItem (client: AbsClient, item: LibraryItem, progress: MediaProgress | undefined): GridItem {
 	const md = item.media.metadata;
 	const started = progress && progress.progress > 0 && !progress.isFinished;
@@ -75,6 +92,9 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 	const [libraries, setLibraries] = useState<LibraryInfo[] | null>(libsCache);
 	const [libraryId, setLibraryId] = useState<string | null>(cache ? cache.libraryId : null);
 	const [sort, setSort] = useState<SortId>(cache ? cache.sort : 'recent');
+	const [filter, setFilter] = useState<LibraryFilter | null>(cache ? cache.filter : null);
+	const [filterData, setFilterData] = useState<FilterData | null>(null);
+	const [filterOpen, setFilterOpen] = useState(false);
 	const [items, setItems] = useState<LibraryItem[]>(cache ? cache.items : []);
 	const [total, setTotal] = useState(cache ? cache.total : -1);
 	const [progress, setProgress] = useState<Record<string, MediaProgress>>({});
@@ -104,15 +124,31 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		};
 	}, [client, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	const fetchPage = (lib: string, sortId: SortId, page: number, append: boolean) => {
+	const fetchPage = (lib: string, sortId: SortId, page: number, append: boolean, f: LibraryFilter | null = filter) => {
 		if (loading.current) return;
 		loading.current = true;
 		const s = SORTS.filter((x) => x.id === sortId)[0];
-		client.libraryItems(lib, {sort: s.key, desc: s.desc, page, limit: PAGE}).then((res) => {
+		const sources = f ? sourcesOf(f) : [];
+		// A tidied choice standing for several server values: fetch each in full and merge them.
+		const request = sources.length > 1
+			? Promise.all(sources.map((src) => client.libraryItems(lib, {sort: s.key, desc: s.desc, page: 0, limit: 1000, filter: filterParam(f, src)}))).then((pages) => {
+				const seen: Record<string, boolean> = {};
+				const merged: LibraryItem[] = [];
+				pages.forEach((pg) => pg.results.forEach((it) => {
+					if (!seen[it.id]) {
+						seen[it.id] = true;
+						merged.push(it);
+					}
+				}));
+				const results = sortItems(merged, sortId);
+				return {results, total: results.length, limit: results.length, page: 0};
+			})
+			: client.libraryItems(lib, {sort: s.key, desc: s.desc, page, limit: PAGE, filter: filterParam(f)});
+		request.then((res) => {
 			loading.current = false;
 			setItems((prev) => {
 				const next = append ? prev.concat(res.results) : res.results;
-				setCache({libraryId: lib, sort: sortId, items: next, total: res.total, row: append && cache ? cache.row : 0});
+				setCache({libraryId: lib, sort: sortId, filter: f, items: next, total: res.total, row: append && cache ? cache.row : 0});
 				return next;
 			});
 			setTotal(res.total);
@@ -125,9 +161,9 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 	// First page whenever the library or sort changes (unless it's what we already have).
 	useEffect(() => {
 		if (!libraryId) return;
-		if (cache && cache.libraryId === libraryId && cache.sort === sort && cache.items.length) return;
+		if (cache && cache.libraryId === libraryId && cache.sort === sort && sameFilter(cache.filter, filter) && cache.items.length) return;
 		fetchPage(libraryId, sort, 0, false);
-	}, [libraryId, sort, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [libraryId, sort, filter, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Collections and playlists get a chip only when there are some.
 	useEffect(() => {
@@ -153,6 +189,37 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		setSort(id);
 	};
 
+	// What can be filtered on comes from the server once per library, when the panel first opens.
+	useEffect(() => {
+		// Loaded with the library (it also gives the full count for "2 of 181 titles").
+		if (!libraryId || filterData) return undefined;
+		let cancelled = false;
+		client.filterData(libraryId).then((d) => {
+			if (!cancelled) setFilterData(d);
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, libraryId, filterData]);
+
+	// Closing without a change puts focus back on the Filter chip.
+	const closeFilter = useCallback(() => {
+		setFilterOpen(false);
+		window.setTimeout(() => focusWithin('library', 'filter'), 0);
+	}, []);
+
+	const chooseFilter = (f: LibraryFilter | null) => {
+		if (sameFilter(f, filter)) {
+			closeFilter();
+			return;
+		}
+		setFilterOpen(false);
+		setCache(null);
+		setItems([]);
+		setTotal(-1);
+		setFilter(f);
+	};
+
 	const nextLibrary = () => {
 		if (!libraries || libraries.length < 2 || !libraryId) return;
 		const i = libraries.map((l) => l.id).indexOf(libraryId);
@@ -161,6 +228,9 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		setCache(null);
 		setItems([]);
 		setTotal(-1);
+		// Another library has its own genres and narrators.
+		setFilter(null);
+		setFilterData(null);
 		setLibraryId(next.id);
 	};
 
@@ -179,7 +249,11 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 					) : (
 						<h1 className="vf-browse__h1">{current ? current.name : 'Library'}</h1>
 					)}
-					{total >= 0 && <span className="vf-muted vf-browse__count">{total + ' titles'}</span>}
+					{total >= 0 && (
+						<span className="vf-muted vf-browse__count">
+							{filter && filterData && filterData.bookCount ? total + ' of ' + filterData.bookCount + ' titles' : total + (total === 1 ? ' title' : ' titles')}
+						</span>
+					)}
 				</div>
 				<div className="vf-sorts" role="group" aria-label="Sort">
 					{lists > 0 && libraryId && (
@@ -187,7 +261,22 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 							{'Collections · ' + lists}
 						</Button>
 					)}
-					<span className="vf-sorts__label">Sort</span>
+					<Button
+						variant="chip"
+						className={'vf-sort vf-filterchip' + (filter ? ' is-active' : '')}
+						data-focus-key="filter"
+						aria-label={filter ? 'Filtered by ' + filterLabel(filter) + '. OK to change' : 'Filter'}
+						onClick={() => setFilterOpen(true)}
+						onKeyDown={(ev: KeyboardEvent<HTMLElement>) => {
+							// Red clears the filter here too.
+							if (ev.keyCode !== Keys.RED || !filter) return;
+							ev.preventDefault();
+							chooseFilter(null);
+						}}
+					>
+						<Icon name="filter" size={22} /><span className="vf-filterchip__label">{filter ? filterLabel(filter) : 'Filter'}</span>
+					</Button>
+					<span className="vf-sorts__label vf-sorts__label--gap">Sort</span>
 					{SORTS.map((s) => (
 						<Button
 							key={s.id}
@@ -209,6 +298,13 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 					setReload((n) => n + 1);
 				}}
 				/>
+			) : total === 0 && filter ? (
+				<div className="vf-browse__message">
+					<p className="vf-message__body">{noMatchText(filter)}</p>
+					<div className="vf-row">
+						<Button variant="primary" data-default-focus onClick={() => chooseFilter(null)}>Show all books</Button>
+					</div>
+				</div>
 			) : total === 0 ? (
 				<p className="vf-message__body vf-browse__message">This library has no books yet.</p>
 			) : items.length === 0 ? (
@@ -222,6 +318,7 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 						onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)}
 					/>
 			)}
+			{filterOpen && <FilterPanel data={filterData} current={filter} onPick={chooseFilter} onClose={closeFilter} />}
 		</ScreenContainer>
 	);
 }

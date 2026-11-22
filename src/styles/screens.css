@@ -2935,3 +2935,79 @@
 	padding-bottom: 24px;
 	margin-bottom: -24px;
 }
+
+/* ---- library filter ---------------------------------------------------------------------------- */
+
+.vf-filterchip > svg {
+	margin-right: 10px;
+}
+
+.vf-filterchip {
+	max-width: 360px;
+}
+
+/* A filter in force reads as selected, like the chosen sort: books are being hidden. */
+.vf-btn--chip.vf-filterchip.is-active:not(:focus) {
+	background: var(--vf-paper);
+	color: var(--vf-ground);
+}
+
+.vf-filterchip {
+	min-width: 150px;
+}
+
+.vf-filterchip__label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vf-filter__current {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 20px;
+	font-size: 22px;
+}
+
+.vf-filter__meta {
+	height: 30px;
+	margin-top: 18px;
+	font-size: 20px;
+	color: var(--vf-faint);
+}
+
+.vf-sorts__label--gap {
+	margin-left: 24px;
+}
+
+.vf-filter {
+	width: 820px;
+}
+
+.vf-filter__tabs {
+	margin-top: 28px;
+}
+
+
+
+.vf-filter__value {
+	justify-content: space-between;
+}
+
+.vf-filter__value > svg {
+	flex: none;
+	margin-left: 16px;
+	color: var(--vf-brass);
+}
+
+.vf-filter__value .vf-chapter__title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vf-filter__value.is-current .vf-chapter__title {
+	color: var(--vf-brass);
+}
