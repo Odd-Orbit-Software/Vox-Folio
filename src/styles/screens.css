@@ -2386,6 +2386,13 @@
 	letter-spacing: 0.02em;
 }
 
+/* Newsreader's capitals sit high in their line box: nudge them to the optical centre (the same
+   proportion as the profile avatars, so it holds at every size). */
+.vf-cover--initials > span {
+	line-height: 1;
+	padding-top: 0.19em;
+}
+
 /* ---- household profiles (★) ------------------------------------------------------------------ */
 
 .vf-rail__avatar {
