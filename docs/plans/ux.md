@@ -35,7 +35,7 @@ Covers are square everywhere, because that's the shape Audiobookshelf usually st
 | Play/Pause | Resume the focused book, or the current one | Toggle |
 | ◀◀ / ▶▶ | — | Skip back 30s / forward 30s (configurable) |
 | Channel ▲/▼ | Page the grid | Next / previous chapter |
-| Red / Green / Yellow / Blue | — | Chapters / Speed / Sleep timer (later) / Autoplay |
+| Red / Green / Yellow / Blue | Blue: back to the player (when a book is loaded) | Chapters / Speed / Sleep timer (with the autoplay toggle) / Bookmark here |
 | Magic Remote pointer | Hover gives focus | Click the scrubber to seek |
 
 On the player, Up/Down moves between rows: transport, then scrubber, then secondary actions. Left/Right on the focused scrubber steps 10s, holding it accelerates to 1 min and then to 5 min steps, and OK confirms the seek. While a seek is pending, a preview shows the target chapter and time, and Back cancels it.

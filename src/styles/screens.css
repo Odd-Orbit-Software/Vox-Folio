@@ -2748,3 +2748,28 @@
 	width: 130px;
 	margin-top: 10px;
 }
+
+/* ---- blue key ------------------------------------------------------------------------------- */
+
+.vf-dot--blue {
+	background: #4F8FE8;
+}
+
+/* The blue dot on the bookmark button: Blue adds a bookmark. */
+.vf-round__dot {
+	position: absolute;
+	top: 4px;
+	right: 0;
+	width: 12px;
+	height: 12px;
+	margin: 0;
+}
+
+.vf-sleep__autoplay {
+	margin-top: 28px;
+	gap: 14px;
+}
+
+.vf-sleep__autoplay svg {
+	margin-right: 14px;
+}

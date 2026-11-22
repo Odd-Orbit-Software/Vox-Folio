@@ -531,6 +531,12 @@ function App () {
 				return;
 			}
 			if (!e || !loaded) return;
+			// Blue: back to what's playing from anywhere (the player itself uses Blue for a bookmark).
+			if (code === Keys.BLUE && r.name !== 'player' && r.name !== 'setup' && r.name !== 'profiles') {
+				ev.preventDefault();
+				setStack((st) => push(st, {name: 'player'}));
+				return;
+			}
 			if (code === Keys.PLAY) e.play();
 			else if (code === Keys.PAUSE) e.toggle();
 			else if (code === Keys.REWIND) e.skip(-getSettings().skipBack);

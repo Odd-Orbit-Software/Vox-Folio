@@ -3,6 +3,11 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.2.1
+
+- The blue button adds a bookmark in the player, and jumps back to the player from anywhere else.
+- Autoplay for the next book in a series moves into the sleep timer panel.
+
 ## 0.2.0
 
 **Listening**

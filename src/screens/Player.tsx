@@ -45,7 +45,16 @@ export function sleepChipLabel (sleep: SleepState | null): string {
 	return formatDuration(Math.ceil(sleep.remainingMs / 60000) * 60);
 }
 
-function SleepPanel ({sleep, preferred, onPick}: {sleep: SleepState | null; preferred: SleepDefault; onPick: (c: SleepDefault) => void}) {
+interface SleepPanelProps {
+	sleep: SleepState | null;
+	preferred: SleepDefault;
+	onPick: (c: SleepDefault) => void;
+	/** Shown for books in a series: whether the next one plays on its own. */
+	autoplay: boolean | null;
+	onToggleAutoplay: () => void;
+}
+
+function SleepPanel ({sleep, preferred, onPick, autoplay, onToggleAutoplay}: SleepPanelProps) {
 	const active: SleepDefault | null = !sleep ? 'off' : sleep.mode === 'chapter' ? 'chapter' : null;
 	const focusOn = active && active !== 'off' ? active : preferred;
 	return (
@@ -70,6 +79,11 @@ function SleepPanel ({sleep, preferred, onPick}: {sleep: SleepState | null; pref
 					))}
 				</div>
 				<p className="vf-panel__note">Fades out at the end. Press any key at &ldquo;Still listening?&rdquo; to keep going.</p>
+				{autoplay !== null && (
+					<Button className={'vf-sleep__option vf-sleep__autoplay' + (autoplay ? ' is-selected' : '')} data-focus-key="autoplay" onClick={onToggleAutoplay}>
+						<Icon name="autoplay" size={28} />{autoplay ? 'Autoplay the next book: on' : 'Autoplay the next book: off'}
+					</Button>
+				)}
 			</PanelScope>
 		</>
 	);
@@ -312,7 +326,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 			else if (isBackKey(code) && preview !== null) setPreview(null);
 			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
 			else if (code === Keys.RED) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
-			else if (code === Keys.BLUE) onToggleAutoplay();
+			else if (code === Keys.BLUE) onAddBookmark();
 			else if (code === Keys.YELLOW) setPanel((o) => (o === 'sleep' ? 'none' : 'sleep'));
 			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
 			else if (code === Keys.CH_DOWN && panel === 'none') engine.previousChapter();
@@ -324,7 +338,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [engine, panel, preview, showUpNext, player.chapters.length, onDeclineNext, onToggleAutoplay]);
+	}, [engine, panel, preview, showUpNext, player.chapters.length, onDeclineNext, onAddBookmark]);
 
 	// When a panel closes, put focus back on the button that opened it.
 	const wasOpen = useRef<Panel>('none');
@@ -487,7 +501,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 							<span className="vf-dot vf-dot--green" />{formatRate(p.rate)}
 						</Button>
 						<Button variant="icon" className="vf-round vf-round--small" aria-label="Add a bookmark here" data-focus-key="bookmark" onClick={onAddBookmark}>
-							<Icon name="bookmark" size={28} />
+							<Icon name="bookmark" size={28} /><span className="vf-dot vf-dot--blue vf-round__dot" />
 						</Button>
 						<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel(p.chapters.length ? 'chapters' : 'bookmarks')}>
 							<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : 'Bookmarks'}
@@ -505,6 +519,8 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						engine.setSleep(c);
 						setPanel('none');
 					}}
+					autoplay={p.series ? autoplay : null}
+					onToggleAutoplay={onToggleAutoplay}
 				/>
 			)}
 			{p.sleep && p.sleep.prompt && panel === 'none' && <StillListening sleep={p.sleep} />}
