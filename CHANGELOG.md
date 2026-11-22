@@ -3,6 +3,10 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.8.1
+
+- The initials in the round profile pictures ("Who's listening?") are now vertically centred.
+
 ## 0.8.0
 
 **Year in Review ★**

@@ -2440,10 +2440,13 @@
 .vf-profile__avatar {
 	width: 200px;
 	height: 200px;
+	box-sizing: border-box;
 	border-radius: 50%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	/* Newsreader's capitals sit high in their line box; this centres the initials optically. */
+	padding-top: 14px;
 	font: 500 72px/1 'Newsreader', serif;
 	color: rgba(243, 238, 230, 0.92);
 }
@@ -2453,6 +2456,7 @@
 }
 
 .vf-profile__avatar--add {
+	padding-top: 0;
 	background: transparent;
 	border: 3px dashed #4A4741;
 	box-sizing: border-box;
