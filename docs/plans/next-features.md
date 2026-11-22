@@ -208,6 +208,101 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
     - A month bar strip (the API only gives the busiest month).
     - A seasonal prompt on Home.
 
+## Batch 2 (agreed 2026-11-22, after 0.8.1 was pushed to main)
+
+The user is using the TV: **ask before any TV test**, and batch the tests so you ask as rarely as possible. After each step, run the impeccable UX/UI review (the design agent, plus the detector run directly), apply the fixes, then commit.
+
+| # | Item | Version | Status |
+| --- | --- | --- | --- |
+| G1 | Screen off while listening: the screensaver can be a black screen (OLED care) | 0.9.0 (G1–G6 are separate commits under one bump) | done (0.9.0) |
+| G2 | Text size: Standard / Large (the small text gets bigger) | 0.9.0 | done (0.9.0) |
+| G3 | Reduce motion: no scrolling titles, slides or fades, and the screensaver hops instead of drifting | 0.9.0 | done (0.9.0) |
+| G4 | Reorder Home rows (Channel +/− on a Home row setting) and Reset Home rows | 0.9.0 | done (0.9.0) |
+| G5 | Sleep timer fade length: 10 s / 30 s / 60 s | 0.9.0 | done (0.9.0) |
+| G6 | Diagnostics page: app and server versions, connection, live updates state, clear cached data | 0.9.0 | done (0.9.0) |
+| H1 | Undo for a live jump ("Picked up from another device", then Red to go back) | 0.9.1 (H1–H3 share one bump) | done (0.9.1) |
+| H2 | Year in Review prompt on Home in December and early January | 0.9.1 | done (0.9.1) |
+| H3 | Clickable covers on Year in Review (OK opens the book) | 0.9.1 | done (0.9.1) |
+| I1 | Playlist queue panel in the player: the entries with the current one marked, jump to an entry, stop after this one, leave the playlist | 0.10.0 | done (0.10.0) |
+
+### Batch 2 notes
+- **Shared settings code:** `settings.ts` adds `homeRowOrder`, `screensaver` ('cover' | 'dark'), `textSize`, `reduceMotion` and `sleepFade`, plus `orderedHomeRows`, `moveHomeRow`, `homeRowsAreDefault`, `defaultHomeRows` and `stepChoice` (+ `settings.test.ts`).
+- **G1 Screen off:** App renders `.vf-screenoff` (pure black) in place of the Screensaver.
+- **G2 Large text:** the root class `vf-text-large` overrides the small reading text.
+- **G3 Reduce motion:** the root class `vf-reduce-motion`:
+  - turns off transitions and animations;
+  - stops marquee titles;
+  - makes the screensaver hop to a random spot each minute, with no corner bursts.
+- **G4 Home row order:** CH+/− on a Home rows setting moves the row, with "Reset Home rows" once changed. Home renders rows through `rowsInOrder`.
+- **G5 Sleep fade:** `engine.sleepFadeMs` comes from settings. "Still listening?" appears when the fade starts, if that's earlier than 30 s (+ test).
+- **G6 Diagnostics:** the `diagnostics` route and `Diagnostics.tsx`. It uses `serverStatus()` (`/status`, no auth) and the live status store in `live.ts`, and has "Clear saved Home" (the `voxfolio.home.v1:*` keys).
+- **Avatar fix:** `.vf-cover--initials > span` gets a 0.19em top nudge. The user asked for this; it covers author circles.
+- **H1 Live jump undo:**
+  - The engine keeps `remoteJump {from, to}` for 60 s; it clears on play. `undoRemoteJump()` (+ test).
+  - The player shows "Moved to X by another device · [Back to Y]". It's a chip rather than a colour key, because all four colour keys are taken in the player.
+- **H2 Home prompt:** `yearToPrompt` covers 1 Dec – 15 Jan, and is dismissed per year (`voxfolio.yearPrompt.dismissed`).
+  - The Home band reads "Your 2026 in listening is ready", with See your year / Not now.
+  - The dev launch param `yearPrompt` (with `probe`) forces it.
+  - The yearReview route takes `year`.
+- **H3 Clickable covers:** covers are Tiles; OK opens Details, and focus is restored on return. A module cache keeps the chosen year and summaries for the visit.
+- **Desktop testing:** the user wasn't free for the TV, so screens were checked in headless Chromium:
+  - `scratchpad/shoot.js <png> '<params>' [ms] [localStorage json]` against `dist` served by `python3 -m http.server 8899`.
+  - It uses `--disable-web-security` (CORS) and devLogin as claude-test-2.
+  - `qseed.json` seeds the Weekend queue.
+  - It is not Chromium 79, so the TV check is still needed before committing.
+- **Review fixes applied (impeccable; detector clean after removing a side-tab border on the Year hero):**
+  - **G:**
+    - Screen off shows "Screen off · press any key" for about 4 s, and a dim "Still listening?" when the sleep prompt is up.
+    - Focused Home row settings show "CH ▲▼ to move · n of 7".
+    - Reset Home rows is always inside its section (inert when unchanged) and shows a toast.
+    - Off rows dim only the value.
+    - Large text also scales setting labels, facts, row titles, bylines, chapter titles and toasts.
+    - Sleep fade reads "Short · 10 s" and so on.
+    - Diagnostics uses plain words ("Reachable · quick"), with a "For support" section for versions, device name, sign-in and cache size. The Back hint is gone because Done is enough.
+    - The live status snapshot is cached; a fresh object every read had caused an infinite render loop and a blank page.
+  - **H:**
+    - Focus goes back to Play if the undo chip expires while focused.
+    - A new undo icon.
+    - The toast and chip show where the book actually landed (after smart rewind).
+    - The prompt says "Later" (a 7-day snooze); opening the review dismisses it for the year. It's stored per user under `voxfolio.yearPrompt.v2:<userId>`.
+  - **I:**
+    - "Up next" uses the real next key, and Finished comes from progress, not position.
+    - Episode rows show their date.
+    - OK on the playing row closes the panel.
+    - Stop-after shows a tick.
+    - Leave playlist is quieter and needs two presses.
+    - Autoplay off in a playlist says "Play X to carry on with Q".
+    - If the remaining entries are all finished, the end of the playlist is announced.
+  - Left for later:
+    - A Playlist tab inside the Red panel.
+    - An undo toast for Leave.
+    - Trimming the Home cache (~410 KB).
+    - A remote-buttons legend under Help.
+- **I1 Queue panel:** the player shows a "≡ 2 of 3" chip after Autoplay, which opens QueuePanel:
+  - the entries, with Playing / Up next;
+  - OK jumps to an entry (and clears stop-after);
+  - Stop after this one (`queue.stopAfter`, which makes Up Next null and shows a toast at the end);
+  - Leave playlist.
+
+### Batch 2: TV test (user said yes, 2026-11-22)
+- Verified on the TV with claude-test-2:
+  - CH▼/▲ moves Home rows, with the hint "CH ▲▼ to move · 2 of 7".
+  - Screen off shows its cue, then goes fully black.
+  - The queue panel shows Finished / Playing / Up next.
+  - Live-jump undo: Up from Play goes to the scrubber, then the chip; OK goes back and focus returns to Play.
+  - The Year prompt on Home works (dev param).
+  - Diagnostics works.
+- Fixed during the test: Down on the last Settings row jumped to the rail; it now stays put.
+- Test slips: an extra OK turned Autoplay off and another turned Night mode off for claude-test-2. Both were put back. These are TV-only settings, with no ABS data involved.
+- The Martian on claude-test-2 is at about 20:00. The Weekend queue is active there.
+- Home cache on the TV is about 890 KB for 3 accounts. Trimming it is a follow-up.
+- Commits:
+  - `c78772a`: author initials.
+  - `ca9545e`: 0.9.0 settings. It also carries the Year in Review code its shared hunks needed.
+  - `0415b7d`: 0.9.1.
+  - Next: 0.10.0 queue panel.
+  - Each commit was typechecked on its own with `scratchpad/checkstaged.sh`.
+
 ## Log
 
 - 2026-11-22: The user asked to centre the round profile avatars' initials vertically (Newsreader caps sit high). Fixed in 0.8.1.

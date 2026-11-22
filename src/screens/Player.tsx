@@ -20,6 +20,11 @@ interface PlayerProps {
 	autoplay: boolean;
 	/** "Weekend queue · 2 of 5" while playing a playlist in order, else null. */
 	queueLabel: string | null;
+	/** The playlist being played, for the queue panel. */
+	queue: QueueView | null;
+	onQueuePick: (key: string) => void;
+	onStopAfter: () => void;
+	onLeaveQueue: () => void;
 	/** The next book in the series (or a podcast's next episode) when autoplay will play it, else null. */
 	next: NextUp | null;
 	nextCoverUrl: string;
@@ -37,7 +42,7 @@ interface PlayerProps {
 	onRemoveBookmark: (b: Bookmark) => void;
 }
 
-type Panel = 'none' | 'speed' | 'chapters' | 'bookmarks' | 'sleep';
+type Panel = 'none' | 'speed' | 'chapters' | 'bookmarks' | 'sleep' | 'queue';
 
 const SLEEP_OPTIONS: SleepDefault[] = ['off', 'chapter', 15, 30, 45, 60];
 
@@ -237,6 +242,81 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 	);
 }
 
+export interface QueueView {
+	name: string;
+	entries: NextUp[];
+	at: number;
+	stopAfter: boolean;
+	/** What will actually play next (finished entries are skipped), or null. */
+	nextKey: string | null;
+	/** Entries already finished. */
+	done: string[];
+}
+
+interface QueuePanelProps {
+	queue: QueueView;
+	onPick: (key: string) => void;
+	onStopAfter: () => void;
+	onLeave: () => void;
+}
+
+/** The playlist being played: where you are in it, jump to any entry, stop after this one, or leave. */
+function QueuePanel ({queue, onPick, onStopAfter, onLeave}: QueuePanelProps) {
+	const [row, setRow] = useState(queue.at);
+	// Leaving takes a second press, so a stray OK doesn't lose the place.
+	const [confirmLeave, setConfirmLeave] = useState(false);
+	return (
+		<>
+			<div className="vf-scrim" />
+			<PanelScope id="queue-panel" className="vf-panel">
+				<div className="vf-panel__head">
+					<h2 className="vf-panel__title vf-queue__title">{queue.name}</h2>
+					<span className="vf-muted">Back to close</span>
+				</div>
+				<p className="vf-panel__status">{'Playlist · ' + (queue.at + 1) + ' of ' + queue.entries.length + (queue.stopAfter ? ' · stopping after this one' : '') + (queue.done.length ? ' · ' + queue.done.length + ' finished' : '')}</p>
+				<div className="vf-chapters" onScroll={pinScroll}>
+					<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, row - 3) * CHAPTER_PITCH + 'px)'}}>
+						{queue.entries.map((e, i) => {
+							const finished = queue.done.indexOf(e.key) !== -1;
+							const state = i === queue.at ? 'Playing' : e.key === queue.nextKey && !queue.stopAfter ? 'Up next' : finished ? 'Finished' : e.episodeId ? e.date : '';
+							return (
+								<li key={e.key}>
+									<Tile
+										className={'vf-chapter' + (i === queue.at ? ' is-current' : '') + (finished && i !== queue.at ? ' is-played' : '')}
+										data-focus-key={'queue:' + i}
+										data-default-focus={i === queue.at || undefined}
+										aria-label={(i + 1) + '. ' + e.title + (state ? ', ' + state : '')}
+										onFocus={() => setRow(i)}
+										onClick={() => onPick(e.key)}
+									>
+										<span className="vf-chapter__num">{i + 1}</span>
+										<span className="vf-chapter__title">{e.title}</span>
+										<span className="vf-chapter__meta">{state}</span>
+									</Tile>
+								</li>
+							);
+						})}
+					</ol>
+				</div>
+				<div className="vf-row vf-row--spaced vf-queue__actions">
+					<Button className={queue.stopAfter ? 'is-selected' : ''} role="switch" aria-checked={queue.stopAfter} data-focus-key="stop-after" onClick={onStopAfter}>
+						{queue.stopAfter && <Icon name="check" size={24} />}{queue.stopAfter ? 'Stopping after this one' : 'Stop after this one'}
+					</Button>
+					<Button
+						variant="chip"
+						className="vf-queue__leave"
+						data-focus-key="leave-queue"
+						onBlur={() => setConfirmLeave(false)}
+						onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
+					>
+						{confirmLeave ? 'Press OK again to leave the playlist' : 'Leave playlist'}
+					</Button>
+				</div>
+			</PanelScope>
+		</>
+	);
+}
+
 function UpNextCard ({next, coverUrl, seconds, onPlay, onDecline}: {next: NextUp; coverUrl: string; seconds: number; onPlay: () => void; onDecline: () => void}) {
 	const label = next.label || (next.episodeId ? next.date : next.sequence ? bookLabel(next.sequence) : '');
 	return (
@@ -310,7 +390,7 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, autoplay, queueLabel, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
+export default function Player ({engine, player, autoplay, queueLabel, queue, onQueuePick, onStopAfter, onLeaveQueue, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
 	const [panel, setPanel] = useState<Panel>('none');
 	const speedOpen = panel === 'speed';
 	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
@@ -513,6 +593,11 @@ export default function Player ({engine, player, autoplay, queueLabel, next, nex
 								<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
 							</Button>
 						)}
+						{queue && (
+							<Button variant="chip" className="vf-queuechip" data-focus-key="queue" aria-label={'Playlist ' + queue.name + ', ' + (queue.at + 1) + ' of ' + queue.entries.length + '. OK to see it'} onClick={() => setPanel('queue')}>
+								<Icon name="queue" size={24} />{(queue.at + 1) + ' of ' + queue.entries.length}
+							</Button>
+						)}
 					</div>
 					<div className="vf-transport__main">
 						<Button variant="icon" className="vf-round" aria-label="Previous chapter" disabled={!p.chapters.length} onClick={() => engine.previousChapter()}><Icon name="prevChapter" size={34} /></Button>
@@ -561,6 +646,22 @@ export default function Player ({engine, player, autoplay, queueLabel, next, nex
 					autoplay={hasNext ? autoplay : null}
 					episode={Boolean(p.episodeId)}
 					onToggleAutoplay={onToggleAutoplay}
+				/>
+			)}
+			{panel === 'queue' && queue && (
+				<QueuePanel
+					queue={queue}
+					onPick={(key) => {
+						setPanel('none');
+						// OK on the entry that's playing just closes the panel.
+						if (queue.entries[queue.at] && queue.entries[queue.at].key === key) return;
+						onQueuePick(key);
+					}}
+					onStopAfter={onStopAfter}
+					onLeave={() => {
+						setPanel('none');
+						onLeaveQueue();
+					}}
 				/>
 			)}
 			{p.sleep && p.sleep.prompt && panel === 'none' && <StillListening sleep={p.sleep} />}

@@ -14,6 +14,8 @@ export interface Queue {
 	replay?: boolean;
 	/** The account it belongs to, so a saved queue isn't picked up by another profile. */
 	userId?: string;
+	/** "Stop after this one": the entry after which the playlist pauses instead of going on. */
+	stopAfter?: string;
 }
 
 /** The playlist's playable entries, in its order. */

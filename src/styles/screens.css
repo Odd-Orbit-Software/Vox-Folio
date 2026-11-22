@@ -838,8 +838,14 @@
 }
 
 .vf-transport__side {
-	width: 520px;
+	width: 560px;
 	font-size: 22px;
+}
+
+/* Chips on either side never wrap their labels; they hold their width. */
+.vf-transport__side > .vf-btn {
+	flex: none;
+	white-space: nowrap;
 }
 
 .vf-transport__side--end {

@@ -436,7 +436,7 @@ function App () {
 		let cancelled = false;
 		const inQueue = queue && queueIndex(queue, forKey) !== -1 ? queue : null;
 		const found = inQueue
-			? client.progressByItem().catch(() => ({})).then((p) => nextInQueue(inQueue, forKey, p))
+			? (inQueue.stopAfter === forKey ? Promise.resolve(null) : client.progressByItem().catch(() => ({})).then((p) => nextInQueue(inQueue, forKey, p)))
 			: episodeId
 			? findNextEpisode(client, itemId, episodeId)
 			: series && libraryId
@@ -529,6 +529,16 @@ function App () {
 							pushToast('End of ' + q.name);
 							setQueue(null);
 							saveQueue(null);
+						} else if (q && at !== -1 && (q.stopAfter === key || !on)) {
+							// Stopped where the listener asked (or with Autoplay off); the playlist carries on next time.
+							const following = q.entries[at + 1];
+							pushToast('Stopped after ' + s.title + '.' + (following ? ' Play ' + following.title + ' to carry on with ' + q.name + '.' : ''));
+							setQueue({...q, stopAfter: undefined});
+						} else if (q && at !== -1 && !hasNext) {
+							// Everything after this was already finished.
+							pushToast('End of ' + q.name);
+							setQueue(null);
+							saveQueue(null);
 						} else {
 							pushToast('Finished ' + s.title);
 						}
@@ -596,8 +606,23 @@ function App () {
 		return () => {
 			document.removeEventListener('visibilitychange', onVisible);
 			sock.stop();
+			setLiveStatus('off');
 		};
 	}, [client, engine]);
+
+	// Which playlist entries are finished, for the queue panel (refreshed as the playlist moves on).
+	const [queueDone, setQueueDone] = useState<string[]>([]);
+	const queueKeyNow = player.itemId ? progressKey(player.itemId, player.episodeId) : null;
+	useEffect(() => {
+		if (!client || !queue) return undefined;
+		let cancelled = false;
+		client.progressByItem().then((p) => {
+			if (!cancelled) setQueueDone(queue.entries.filter((e) => p[e.key] && p[e.key].isFinished).map((e) => e.key));
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, queue, queueKeyNow]);
 
 	// The playlist survives a relaunch (for the same account).
 	useEffect(() => {
@@ -719,7 +744,9 @@ function App () {
 	};
 	const playerKey = player.itemId ? progressKey(player.itemId, player.episodeId) : null;
 	const queueAt = queueIndex(queue, playerKey);
-	const queueLabel = queue && queueAt !== -1 ? queue.name + ' · ' + (queueAt + 1) + ' of ' + queue.entries.length : null;
+	const queueLabel = queue && queueAt !== -1 ? queue.name + ' · ' + (queueAt + 1) + ' of ' + queue.entries.length + (queue.stopAfter === playerKey ? ' · stopping after this one' : '') : null;
+	const queueNext = upNext && upNext.forKey === playerKey && upNext.next ? upNext.next.key : null;
+	const queueForPlayer = queue && queueAt !== -1 ? {name: queue.name, entries: queue.entries, at: queueAt, stopAfter: queue.stopAfter === playerKey, nextKey: queueNext, done: queueDone} : null;
 	const nextForPlayer = upNext && playerKey && upNext.forKey === playerKey && upNext.next && autoplay && declined.indexOf(playerKey) === -1 ? upNext.next : null;
 
 	const profileInfo = currentProfile ? {
@@ -906,6 +933,15 @@ function App () {
 					player={player}
 					autoplay={autoplay}
 					queueLabel={queueLabel}
+					queue={queueForPlayer}
+					onQueuePick={(key) => queue && playQueue({...queue, stopAfter: undefined}, key)}
+					onStopAfter={() => setQueue((q) => (q && playerKey ? {...q, stopAfter: q.stopAfter === playerKey ? undefined : playerKey} : q))}
+					onLeaveQueue={() => {
+						if (!queue) return;
+						pushToast('Left ' + queue.name);
+						setQueue(null);
+						saveQueue(null);
+					}}
 					next={nextForPlayer}
 					nextCoverUrl={nextForPlayer && nextForPlayer.hasCover ? client.coverUrl(nextForPlayer.itemId, 520) : ''}
 					onToggleAutoplay={toggleAutoplay}

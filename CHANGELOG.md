@@ -3,6 +3,14 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.10.0
+
+**The playlist in the player**
+- While you're playing a playlist, a "2 of 3" chip in the player opens it. It shows what's playing, what's up next and what's finished. OK on any entry jumps to it.
+- **Stop after this one** pauses the playlist at the end of the current entry and keeps your place in it.
+- **Leave playlist** asks for a second OK, so a stray press doesn't lose your place.
+- When Autoplay is off, a playlist now says what to play next to carry on. If everything left is already finished, the end of the playlist is announced.
+
 ## 0.9.1
 
 - **Undo for live jumps.** When another device moves a book that's paused on the TV, the player offers "Back to …" for a minute.
