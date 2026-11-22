@@ -13,6 +13,8 @@ const running = new WeakMap<Element, Animation>();
 function start (box: HTMLElement): void {
 	const text = box.firstElementChild as HTMLElement | null;
 	if (!text || running.has(box)) return;
+	// Reduce motion (Settings): titles stay still.
+	if (document.documentElement.classList.contains('vf-reduce-motion')) return;
 	const distance = text.scrollWidth - box.clientWidth;
 	if (distance < 4) return;
 	box.classList.add('is-scrolling');

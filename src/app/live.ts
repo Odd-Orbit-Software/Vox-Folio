@@ -17,3 +17,26 @@ export function subscribeProgress (fn: Listener): () => void {
 		listeners.delete(fn);
 	};
 }
+
+/** The live connection's state, for the Diagnostics page. */
+export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'off';
+// One snapshot object per change, so React's external-store hook sees a stable value.
+let snapshot: {status: LiveStatus; since: number} = {status: 'off', since: 0};
+const statusListeners = new Set<() => void>();
+
+export function setLiveStatus (next: LiveStatus): void {
+	if (next === snapshot.status) return;
+	snapshot = {status: next, since: Date.now()};
+	statusListeners.forEach((fn) => fn());
+}
+
+export function getLiveStatus (): {status: LiveStatus; since: number} {
+	return snapshot;
+}
+
+export function subscribeLiveStatus (fn: () => void): () => void {
+	statusListeners.add(fn);
+	return () => {
+		statusListeners.delete(fn);
+	};
+}

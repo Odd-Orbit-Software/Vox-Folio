@@ -1,14 +1,15 @@
 import {useEffect, useRef, useState} from 'react';
-import type {KeyboardEvent} from 'react';
+import type {KeyboardEvent, ReactNode} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
 import {progressKey} from '../abs/client';
 import type {LibraryItem, MediaProgress, PodcastEpisode, Shelf} from '../abs/types';
 import {subscribeProgress} from '../app/live';
+import {snoozeYearPrompt} from '../app/yearReview';
 import {episodeDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
-import {homeRowShown, useSettings} from '../app/settings';
+import {homeRowShown, orderedHomeRows, useSettings} from '../app/settings';
 import type {HomeRowId} from '../app/settings';
 import {Button, Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
@@ -401,6 +402,35 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 		}
 	};
 	const nowPlaying = player.itemId && player.status !== 'error' ? player : null;
+
+	// Rows in the listener's order (Settings); the first one with tiles takes focus when there's no hero.
+	const rowEls: Partial<Record<HomeRowId, {el: (focus: boolean) => ReactNode; has: boolean}>> = {
+		'in-progress': {
+			has: showInProgress && rest.length > 0,
+			el: (focus) => (
+				<CoverRow
+					key="in-progress"
+					title="In progress"
+					items={restItems}
+					onSelect={openTile}
+					defaultFocus={focus}
+					action={{label: undoable ? 'Undo remove' : 'Remove from Continue listening', onAction: (g) => {
+						const e = rest.filter((r) => tileKey(r) === g.key)[0];
+						if (e) removeEntry(entryKey(e));
+					}}}
+				/>
+			)
+		},
+		'new-episodes': {
+			has: showNewEpisodes && newEpisodes.length > 0,
+			el: (focus) => <CoverRow key="new-episodes" title="New episodes" items={newEpisodes} defaultFocus={focus} onSelect={openTile} />
+		}
+	};
+	extraRows.forEach((r) => {
+		rowEls[r.id] = {has: true, el: (focus) => <CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={focus} onSelect={(g) => openShelfTile(r, g)} />};
+	});
+	const shown = orderedHomeRows(settings).filter((id) => rowEls[id] && rowEls[id]!.has);
+	const rowsInOrder = shown.map((id, i) => rowEls[id]!.el(!hero && !nowPlaying && i === 0));
 
 	return (
 		<ScreenContainer id="home" className="vf-home vf-browse" restoreKey={restoreKey} focusDeps={[load.state, extraRows.length > 0]}>

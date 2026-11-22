@@ -39,7 +39,7 @@ import Authors from '../screens/Authors';
 import BookList from '../screens/BookList';
 import Collections from '../screens/Collections';
 import {LiveSocket} from '../abs/socket';
-import {publishProgress} from '../app/live';
+import {publishProgress, setLiveStatus} from '../app/live';
 import {loadQueue, nextInQueue, queueIndex, saveQueue} from '../app/queue';
 import type {Queue} from '../app/queue';
 import Details from '../screens/Details';
@@ -52,6 +52,8 @@ import SeriesDetail from '../screens/SeriesDetail';
 import Search, {presetSearch} from '../screens/Search';
 import Stats from '../screens/Stats';
 import YearReview from '../screens/YearReview';
+import {dismissYearPrompt, yearToPrompt} from '../app/yearReview';
+import Diagnostics from '../screens/Diagnostics';
 import SeriesList from '../screens/SeriesList';
 import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
@@ -229,6 +231,10 @@ function App () {
 	useEffect(() => {
 		if (engine) engine.setSmartRewind(settings.smartRewind);
 	}, [engine, settings.smartRewind]);
+
+	useEffect(() => {
+		if (engine) engine.setSleepFade(settings.sleepFade);
+	}, [engine, settings.sleepFade]);
 
 	// "Still listening?": any key keeps listening, including the press that wakes the screensaver.
 	useEffect(() => {
@@ -547,6 +553,13 @@ function App () {
 		setQueue({...q, userId: current.client.credentials.userId});
 	}, [openBook]);
 
+	// Text size and Reduce motion apply app-wide, as classes on the root.
+	useEffect(() => {
+		const root = document.documentElement;
+		root.classList.toggle('vf-text-large', settings.textSize === 'large');
+		root.classList.toggle('vf-reduce-motion', settings.reduceMotion);
+	}, [settings.textSize, settings.reduceMotion]);
+
 	/* Live updates: when the phone (or any other app) saves a position, the server tells us at once. A
 	   paused book here jumps to it, and Home refreshes what it shows. */
 	useEffect(() => {
@@ -558,11 +571,16 @@ function App () {
 				publishProgress(e.progress.data);
 			} else if (e.type === 'userUpdated') {
 				publishProgress(null);
+			} else if (e.type === 'connected') {
+				setLiveStatus('connected');
+			} else if (e.type === 'disconnected') {
+				setLiveStatus('reconnecting');
 			} else if (e.type === 'authFailed') {
 				// The token expired while we were away: get a fresh one and sign the socket in again.
 				client.refresh().then(() => sock.reauth(), () => undefined);
 			}
 		});
+		setLiveStatus('connecting');
 		sock.start();
 		// After standby the connection may have dropped without notice, or the token expired:
 		// freshen the token, then reconnect if needed.
@@ -905,6 +923,8 @@ function App () {
 					onSignOut={() => signOut('')}
 					onStats={() => go({name: 'stats'}, 'stats')}
 					onYearReview={() => go({name: 'yearReview'}, 'yearReview')}
+					onDiagnostics={() => go({name: 'diagnostics'}, 'diagnostics')}
+					onToast={pushToast}
 					onSpeed={(kind, rate) => {
 						savePlaybackRate(rate, kind);
 						// Apply it now when that kind is loaded.
@@ -914,7 +934,8 @@ function App () {
 				/>
 			)}
 			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} onYearReview={() => go({name: 'yearReview'}, 'year')} />}
-			{route.name === 'yearReview' && client && <YearReview client={client} onDone={() => setStack(pop)} />}
+			{route.name === 'diagnostics' && client && <Diagnostics client={client} version={appinfo.version} onDone={() => setStack(pop)} onToast={pushToast} />}
+			{route.name === 'yearReview' && client && <YearReview client={client} initialYear={route.year} restoreKey={top.focusKey} onDone={() => setStack(pop)} onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)} />}
 			{route.name === 'about' && (
 				<About
 					version={appinfo.version}
@@ -924,7 +945,16 @@ function App () {
 				/>
 			)}
 			<Toasts toasts={toasts} />
-			{asleep && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} cornerSoon={devCornerSoon} />}
+			{asleep && settings.screensaver === 'dark' && (
+				<div className="vf-screenoff" role="status" aria-label="Screen off. Press any key.">
+					{/* A few seconds of reassurance that the app is alive, then nothing; the sleep timer's
+					    question is the one thing that shows (dimly) while the screen is off. */}
+					{player.sleep && player.sleep.prompt
+						? <div className="vf-screenoff__note vf-screenoff__note--prompt">Still listening? Press any key</div>
+						: <div className="vf-screenoff__note">Screen off · press any key</div>}
+				</div>
+			)}
+			{asleep && settings.screensaver !== 'dark' && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} cornerSoon={devCornerSoon} />}
 		</div>
 		</PodcastsContext.Provider>
 		</ProfileContext.Provider>

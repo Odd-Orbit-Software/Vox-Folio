@@ -55,6 +55,8 @@ export function Screensaver ({player, listener = '', cornerSoon = false}: Screen
 		started.current = Date.now();
 		let last = 0;
 		const timer = window.setInterval(() => {
+			// Holding still (Reduce motion), the card never travels into a corner.
+			if (document.documentElement.classList.contains('vf-reduce-motion')) return;
 			const t = (Date.now() - started.current) / 1000;
 			const corner = cornerAt(driftAt(t, timing), timing);
 			if (corner && Date.now() - last > 5000) {
@@ -67,10 +69,26 @@ export function Screensaver ({player, listener = '', cornerSoon = false}: Screen
 		return () => window.clearInterval(timer);
 	}, [night, cornerSoon]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// Reduce motion: no drift. The card hops to a new place once a minute instead, so nothing stays lit
+	// in one spot for long.
+	const still = settings.reduceMotion;
+	const [hop, setHop] = useState(() => ({x: DRIFT.xRange / 2, y: DRIFT.yRange / 2}));
+	useEffect(() => {
+		if (!still) return undefined;
+		const timer = window.setInterval(() => setHop({x: Math.round(Math.random() * DRIFT.xRange), y: Math.round(Math.random() * DRIFT.yRange)}), 60000);
+		return () => window.clearInterval(timer);
+	}, [still]);
+	const yStyle = still
+		? {animation: 'none', transform: 'translateY(' + hop.y + 'px)'}
+		: {animationDuration: timing.ySeconds + 's', animationDelay: timing.yDelay + 's'};
+	const xStyle = still
+		? {animation: 'none', transform: 'translateX(' + hop.x + 'px)'}
+		: {animationDuration: timing.xSeconds + 's', animationDelay: timing.xDelay + 's'};
+
 	return (
 		<div className={'vf-saver' + (night ? ' vf-saver--night' : '')} aria-hidden="true">
-			<div key={night ? 'night' : 'day'} className="vf-saver__y" style={{animationDuration: timing.ySeconds + 's', animationDelay: timing.yDelay + 's'}}>
-				<div className={'vf-saver__x' + (burst ? ' is-perfect' : '')} style={{animationDuration: timing.xSeconds + 's', animationDelay: timing.xDelay + 's'}}>
+			<div key={night ? 'night' : 'day'} className="vf-saver__y" style={yStyle}>
+				<div className={'vf-saver__x' + (burst ? ' is-perfect' : '')} style={xStyle}>
 					{book ? (
 						<div className="vf-saver__card">
 							<Cover url={book.coverUrl} title={book.title} author={book.author} size={280} className="vf-saver__cover" />

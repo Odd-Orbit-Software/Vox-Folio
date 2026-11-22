@@ -3,6 +3,17 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.9.0
+
+**More settings**
+- **Screen off.** The screensaver can be a black screen, which is kindest to an OLED panel. "Screen off · press any key" shows for a moment first, and the sleep timer's "Still listening?" still appears.
+- **Text size.** Large makes details, hints, labels and titles easier to read from the sofa.
+- **Reduce motion.** Nothing slides or scrolls, and the screensaver moves to a new spot once a minute instead of drifting.
+- **Home rows can be put in your own order.** In Settings, Channel up and down move the focused row. Reset Home rows puts them back.
+- **Sleep fade.** Choose how gently the sleep timer turns the sound down: 10, 30 or 60 seconds.
+- **Diagnostics** (Settings → Help) shows whether your server and live updates are working, has a support section, and can clear the saved copy of Home.
+- The initials in round author covers are centred.
+
 ## 0.8.1
 
 - The initials in the round profile pictures ("Who's listening?") are now vertically centred.

@@ -106,3 +106,48 @@ export function summariseYear (year: number, s: YearStats, now: Date): YearSumma
 		empty: s.totalListeningTime < 60
 	};
 }
+
+const PROMPT_KEY = 'voxfolio.yearPrompt.v2:';
+const SNOOZE_MS = 7 * 24 * 3600 * 1000;
+
+function readPrompt (userId: string): {done?: number; snoozedUntil?: number} {
+	try {
+		const raw = window.localStorage.getItem(PROMPT_KEY + userId);
+		return raw ? JSON.parse(raw) as {done?: number; snoozedUntil?: number} : {};
+	} catch {
+		return {};
+	}
+}
+
+function writePrompt (userId: string, value: {done?: number; snoozedUntil?: number}): void {
+	try {
+		window.localStorage.setItem(PROMPT_KEY + userId, JSON.stringify(value));
+	} catch {
+		// Not remembered.
+	}
+}
+
+/** Which year Home should offer a review of, if any: from 1 December (this year) to 15 January
+    (last year), for each listener separately, until they've looked, and not while snoozed.
+    `force` is for testing. */
+export function yearToPrompt (now: Date, userId: string, force = false): number | null {
+	const m = now.getMonth();
+	const year = m === 11 ? now.getFullYear() : m === 0 && now.getDate() <= 15 ? now.getFullYear() - 1 : null;
+	const target = year === null && force ? now.getFullYear() : year;
+	if (target === null) return null;
+	if (force) return target;
+	const p = readPrompt(userId);
+	if (p.done === target) return null;
+	if (p.snoozedUntil && now.getTime() < p.snoozedUntil) return null;
+	return target;
+}
+
+/** They've seen this year's review: don't offer it again. */
+export function dismissYearPrompt (userId: string, year: number): void {
+	writePrompt(userId, {done: year});
+}
+
+/** "Later": ask again in a week (still within the season, or not at all). */
+export function snoozeYearPrompt (userId: string, now: Date): void {
+	writePrompt(userId, {...readPrompt(userId), snoozedUntil: now.getTime() + SNOOZE_MS});
+}

@@ -6,7 +6,8 @@ import {loadPlaybackRate} from '../abs/store';
 import type {SpeedKind} from '../abs/store';
 import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
-import {HOME_ROWS, homeRowShown, nextChoice, SKIP_CHOICES, SLEEP_CHOICES, sleepLabel, stepChoice, toggleHomeRow, updateSettings, useSettings} from '../app/settings';
+import {defaultHomeRows, HOME_ROWS, homeRowsAreDefault, homeRowShown, moveHomeRow, nextChoice, orderedHomeRows, SKIP_CHOICES, SLEEP_CHOICES, SLEEP_FADE_CHOICES, sleepLabel, stepChoice, toggleHomeRow, updateSettings, useSettings} from '../app/settings';
+import type {HomeRowId} from '../app/settings';
 import type {Settings as SettingsValues} from '../app/settings';
 import {Button, Icon, Tile} from '../components/controls';
 import {Rail} from '../components/Rail';
@@ -23,6 +24,8 @@ interface SettingsProps {
 	onSignOut: () => void;
 	onStats: () => void;
 	onYearReview: () => void;
+	onDiagnostics: () => void;
+	onToast: (text: string) => void;
 	/** Save a default speed (and apply it now if that kind is playing). */
 	onSpeed: (kind: SpeedKind, rate: number) => void;
 }
@@ -38,12 +41,22 @@ interface RowProps {
 	onStep?: (dir: 1 | -1) => boolean;
 	/** Dim a switched-off row so it can be spotted at a glance. */
 	off?: boolean;
+	/** Channel up/down move this row in a list (Home rows). */
+	onMove?: (dir: 1 | -1) => void;
+	/** Shown while focused, beside the hint: "CH ▲▼ to move · 3 of 7". */
+	moveHint?: string;
 	first?: boolean;
 }
 
 /** One setting: OK steps to the next value, so it works with nothing but the D-pad. */
-function Row ({id, label, hint, value, onSelect, onStep, off, first}: RowProps) {
+function Row ({id, label, hint, value, onSelect, onStep, off, onMove, moveHint, first}: RowProps) {
 	const onKeyDown = (ev: KeyboardEvent<HTMLElement>) => {
+		if (onMove && (ev.keyCode === Keys.CH_UP || ev.keyCode === Keys.CH_DOWN)) {
+			ev.preventDefault();
+			ev.stopPropagation();
+			onMove(ev.keyCode === Keys.CH_UP ? -1 : 1);
+			return;
+		}
 		if (!onStep || (ev.keyCode !== Keys.LEFT && ev.keyCode !== Keys.RIGHT)) return;
 		if (onStep(ev.keyCode === Keys.RIGHT ? 1 : -1)) {
 			ev.preventDefault();
@@ -54,7 +67,7 @@ function Row ({id, label, hint, value, onSelect, onStep, off, first}: RowProps) 
 		<Tile className={'vf-setting' + (off ? ' is-off' : '')} data-focus-key={id} data-default-focus={first || undefined} onClick={onSelect} onKeyDown={onKeyDown} data-own-left={onStep ? true : undefined} aria-label={label + ': ' + value}>
 			<span className="vf-setting__text">
 				<span className="vf-setting__label">{label}</span>
-				<span className="vf-setting__hint">{hint}</span>
+				<span className="vf-setting__hint">{hint}{moveHint && <span className="vf-setting__move">{moveHint}</span>}</span>
 			</span>
 			<span className="vf-setting__value">
 				{onStep && <Icon name="chevronLeft" size={24} />}
@@ -81,16 +94,19 @@ function nextSpeed (rate: number): number {
 	return above.length ? above[0] : SPEEDS[0];
 }
 
-export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onYearReview, onSpeed}: SettingsProps) {
+export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onYearReview, onDiagnostics, onSpeed, onToast}: SettingsProps) {
 	const s = useSettings();
+	const premiumNow = isPremium();
+	const homeRows = orderedHomeRows(s).map((id) => HOME_ROWS.filter((r) => r.id === id)[0]).filter((r) => premiumNow || !r.premium);
 	const premium = isPremium();
 	const [speeds, setSpeeds] = useState(() => ({book: loadPlaybackRate('book'), podcast: loadPlaybackRate('podcast')}));
 	// The left column is longer than the screen: it slides to keep the focused row in view.
 	const [offset, setOffset] = useState(0);
-	const follow = (ev: FocusEvent<HTMLElement>) => {
-		const row = (ev.target as HTMLElement).closest('.vf-setting') as HTMLElement | null;
-		const column = ev.currentTarget as HTMLElement;
-		if (!row) return;
+	const follow = (ev: FocusEvent<HTMLElement>) => followRow(ev.target as HTMLElement);
+	const followRow = (target: HTMLElement) => {
+		const row = target.closest('.vf-setting') as HTMLElement | null;
+		const column = target.closest('.vf-settings__column') as HTMLElement | null;
+		if (!row || !column) return;
 		// Keep the focused row in the middle band, never sliding past the end of the list.
 		const top = row.offsetTop;
 		const max = Math.max(0, column.offsetHeight - VIEW_HEIGHT);
@@ -108,6 +124,26 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 		updateSettings({[key]: v} as Partial<SettingsValues>);
 		return true;
 	};
+	/** Down on the last setting stays put (rather than jumping to the rail). */
+	const stayAtEnd = (ev: KeyboardEvent<HTMLElement>) => {
+		if (ev.keyCode !== Keys.DOWN) return;
+		const rows = ev.currentTarget.querySelectorAll('.vf-setting');
+		if (rows.length && document.activeElement === rows[rows.length - 1]) {
+			ev.preventDefault();
+			ev.stopPropagation();
+		}
+	};
+
+	/** Move a Home row, keeping it focused and in view as it goes. */
+	const moveRow = (id: HomeRowId) => (dir: 1 | -1) => {
+		const order = moveHomeRow(s, id, dir);
+		if (!order) return;
+		updateSettings({homeRowOrder: order});
+		window.setTimeout(() => {
+			const el = document.querySelector('[data-focus-key="home:' + id + '"]') as HTMLElement | null;
+			if (el) followRow(el);
+		}, 0);
+	};
 	const speedStepper = (kind: SpeedKind) => (dir: 1 | -1) => {
 		const v = stepChoice(SPEEDS, nearestSpeed(speeds[kind]), dir);
 		if (v === null) return false;
@@ -124,7 +160,7 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 
 			<div className="vf-settings__body">
 				<div className="vf-settings__scroll" onScroll={pinScroll}>
-					<div className="vf-settings__column" onFocus={follow} style={{transform: 'translateY(' + -offset + 'px)'}}>
+					<div className="vf-settings__column" onFocus={follow} onKeyDown={stayAtEnd} style={{transform: 'translateY(' + -offset + 'px)'}}>
 						<section className="vf-settings__group" aria-label="Playback">
 							<h2 className="vf-eyebrow">Playback</h2>
 							<Row first id="bookSpeed" label="Book speed" hint="Also changed with the green button while listening" value={formatRate(speeds.book)} onSelect={() => stepSpeed('book')} onStep={speedStepper('book')} />
@@ -133,30 +169,61 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 							<Row id="skipForward" label="Skip forward" hint="How far fast-forward jumps ahead" value={s.skipForward + ' seconds'} onSelect={() => updateSettings({skipForward: nextChoice(SKIP_CHOICES, s.skipForward)})} onStep={stepper('skipForward', SKIP_CHOICES)} />
 							<Row id="smartRewind" label="Smart rewind" hint="Replay a few seconds when you resume" value={onOff(s.smartRewind)} off={!s.smartRewind} onSelect={() => updateSettings({smartRewind: !s.smartRewind})} />
 							<Row id="sleepDefault" label="Sleep timer" hint="Also started with the yellow button" value={sleepLabel(s.sleepDefault)} onSelect={() => updateSettings({sleepDefault: nextChoice(SLEEP_CHOICES, s.sleepDefault)})} onStep={stepper('sleepDefault', SLEEP_CHOICES)} />
+							<Row id="sleepFade" label="Sleep fade" hint="How gently the sleep timer turns the sound down" value={(s.sleepFade <= 10 ? 'Short' : s.sleepFade <= 30 ? 'Medium' : 'Long') + ' · ' + s.sleepFade + ' s'} onSelect={() => updateSettings({sleepFade: nextChoice(SLEEP_FADE_CHOICES, s.sleepFade)})} onStep={stepper('sleepFade', SLEEP_FADE_CHOICES)} />
 							<Row id="autoplay" label="Autoplay" hint="Play what's next in a series, playlist or podcast" value={onOff(s.seriesAutoplay)} off={!s.seriesAutoplay} onSelect={() => updateSettings({seriesAutoplay: !s.seriesAutoplay})} />
 						</section>
 
 						<section className="vf-settings__group" aria-label="Home rows">
 							<h2 className="vf-eyebrow">Home rows</h2>
-							<p className="vf-settings__note">Continue listening always shows at the top.</p>
-							{HOME_ROWS.filter((r) => premium || !r.premium).map((r) => (
+							<p className="vf-settings__note">Continue listening always shows first. Channel up and down move a row.</p>
+							{homeRows.map((r, i) => (
 								<Row
 									key={r.id}
 									id={'home:' + r.id}
 									label={r.label}
 									hint={r.hint}
+									onMove={moveRow(r.id)}
+									moveHint={' · CH ▲▼ to move · ' + (i + 1) + ' of ' + homeRows.length}
 									value={homeRowShown(s, r.id) ? 'Shown' : 'Hidden'}
 									off={!homeRowShown(s, r.id)}
 									onSelect={() => updateSettings({hiddenHomeRows: toggleHomeRow(s, r.id)})}
 								/>
 							))}
+							{/* Always there (disabled when nothing's changed), so the list doesn't jump as rows move. */}
+							<Row
+								id="homeReset"
+								label="Reset Home rows"
+								hint={homeRowsAreDefault(s) ? 'Home rows are as they started' : 'Back to the original order and choice of rows'}
+								value={homeRowsAreDefault(s) ? '' : 'Reset'}
+								off={homeRowsAreDefault(s)}
+								onSelect={() => {
+									if (homeRowsAreDefault(s)) return;
+									updateSettings(defaultHomeRows());
+									onToast('Home rows reset');
+								}}
+							/>
 						</section>
 
-						<section className="vf-settings__group" aria-label="Screensaver and stats">
-							<h2 className="vf-eyebrow">Screensaver and stats</h2>
-							<Row id="nightMode" label="Screensaver night mode ★" hint="Dimmer and slower from 10pm to 6am" value={premium ? onOff(s.nightMode) : '★ Premium'} off={premium && !s.nightMode} onSelect={() => premium && updateSettings({nightMode: !s.nightMode})} />
+
+						<section className="vf-settings__group" aria-label="Screen">
+							<h2 className="vf-eyebrow">Screen</h2>
+							<Row id="screensaver" label="Screensaver" hint={s.screensaver === 'dark' ? 'A black screen while you listen: kindest to an OLED panel' : 'The time and your book, drifting slowly'} value={s.screensaver === 'dark' ? 'Screen off' : 'Moving cover'} onSelect={() => updateSettings({screensaver: s.screensaver === 'dark' ? 'cover' : 'dark'})} />
+							{s.screensaver !== 'dark' && (
+								<Row id="nightMode" label="Night mode ★" hint="A dimmer, slower screensaver from 10pm to 6am" value={premium ? onOff(s.nightMode) : '★ Premium'} off={premium && !s.nightMode} onSelect={() => premium && updateSettings({nightMode: !s.nightMode})} />
+							)}
+							<Row id="textSize" label="Text size" hint="Larger details, hints and labels for reading from further away" value={s.textSize === 'large' ? 'Large' : 'Standard'} onSelect={() => updateSettings({textSize: s.textSize === 'large' ? 'standard' : 'large'})} />
+							<Row id="reduceMotion" label="Reduce motion" hint="No sliding or scrolling titles; the screensaver moves once a minute" value={onOff(s.reduceMotion)} off={!s.reduceMotion} onSelect={() => updateSettings({reduceMotion: !s.reduceMotion})} />
+						</section>
+
+						<section className="vf-settings__group" aria-label="Your listening">
+							<h2 className="vf-eyebrow">Your listening</h2>
 							<Row id="stats" label="Listening stats ★" hint="Time listened, streaks, and books finished" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onStats()} />
 							<Row id="yearReview" label="Year in review ★" hint="Your listening year: hours, books, favourite authors" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onYearReview()} />
+						</section>
+
+						<section className="vf-settings__group" aria-label="Help">
+							<h2 className="vf-eyebrow">Help</h2>
+							<Row id="diagnostics" label="Diagnostics" hint="Versions, the connection to your server, live updates" value="Open" onSelect={onDiagnostics} />
 						</section>
 					</div>
 				</div>

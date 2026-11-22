@@ -1970,6 +1970,8 @@
 
 .vf-settings__column {
 	transition: transform 220ms ease-out;
+	/* The last row can scroll clear of the bottom fade. */
+	padding-bottom: 64px;
 }
 
 .vf-settings__column > .vf-settings__group + .vf-settings__group {
@@ -3089,14 +3091,23 @@
 	color: var(--vf-brass);
 }
 
-.vf-setting.is-off .vf-setting__label,
 .vf-setting.is-off .vf-setting__value {
 	color: var(--vf-faint);
 }
 
-.vf-setting.is-off:focus .vf-setting__label,
 .vf-setting.is-off:focus .vf-setting__value {
 	color: var(--vf-muted);
+}
+
+/* While a Home row setting is focused: how to move it, and where it is. */
+.vf-setting__move {
+	display: none;
+	margin-left: 12px;
+	color: var(--vf-brass);
+}
+
+.vf-setting:focus .vf-setting__move {
+	display: inline;
 }
 
 .vf-setting__value > svg:first-child:not(:last-child) {
@@ -3105,8 +3116,8 @@
 
 .vf-settings__note {
 	margin: -8px 0 16px;
-	font-size: 20px;
-	color: var(--vf-faint);
+	font-size: 22px;
+	color: var(--vf-muted);
 }
 
 .vf-home__customise {
@@ -3271,7 +3282,223 @@
 	top: 54px;
 }
 
-.vf-year__hero {
-	padding-left: 24px;
-	border-left: 4px solid var(--vf-brass);
+
+/* Screen off: true black, so an OLED panel lights nothing while the book plays on. */
+.vf-screenoff {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1920px;
+	height: 1080px;
+	z-index: 20;
+	background: #000;
+	animation: vf-saver-in 600ms ease-out;
+}
+
+.vf-screenoff__note {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	text-align: center;
+	font-size: 26px;
+	color: #6F6A63;
+	opacity: 0;
+	animation: vf-screenoff-note 5s ease-out;
+}
+
+/* The sleep question stays, dim, until it's answered or the timer stops. */
+.vf-screenoff__note--prompt {
+	opacity: 0.7;
+	animation: none;
+}
+
+@keyframes vf-screenoff-note {
+	0%, 70% { opacity: 1; }
+	100% { opacity: 0; }
+}
+
+/* ---- Large text (Settings): the small reading text grows by about a fifth. Buttons and chips keep
+   their sizes, since layouts depend on them. --------------------------------------------------- */
+
+.vf-text-large .vf-eyebrow,
+.vf-text-large .vf-hint,
+.vf-text-large .vf-series__meta,
+.vf-text-large .vf-chapter__meta,
+.vf-text-large .vf-crow__meta,
+.vf-text-large .vf-crow__action,
+.vf-text-large .vf-author__desc,
+.vf-text-large .vf-stat__label,
+.vf-text-large .vf-list__note,
+.vf-text-large .vf-player__scrub-meta,
+.vf-text-large .vf-filter__current,
+.vf-text-large .vf-year__hero {
+	font-size: 26px;
+}
+
+.vf-text-large .vf-book__meta {
+	font-size: 25px;
+}
+
+.vf-text-large .vf-book__title {
+	font-size: 28px;
+}
+
+.vf-text-large .vf-setting__label,
+.vf-text-large .vf-facts {
+	font-size: 32px;
+}
+
+.vf-text-large .vf-crow__title {
+	font-size: 38px;
+}
+
+.vf-text-large .vf-setting__value,
+.vf-text-large .vf-details__byline,
+.vf-text-large .vf-hero__meta,
+.vf-text-large .vf-player__byline,
+.vf-text-large .vf-player__left,
+.vf-text-large .vf-chapter__title,
+.vf-text-large .vf-toast {
+	font-size: 32px;
+}
+
+.vf-text-large .vf-progress-line,
+.vf-text-large .vf-player__series,
+.vf-text-large .vf-panel__note,
+.vf-text-large .vf-browse__count,
+.vf-text-large .vf-series__summary,
+.vf-text-large .vf-series__state,
+.vf-text-large .vf-details__meta,
+.vf-text-large .vf-next__meta,
+.vf-text-large .vf-upnext__meta,
+.vf-text-large .vf-still__body,
+.vf-text-large .vf-author__meta,
+.vf-text-large .vf-show__desc,
+.vf-text-large .vf-stats__note,
+.vf-text-large .vf-profiles__note {
+	font-size: 28px;
+}
+
+.vf-text-large .vf-setting__hint,
+.vf-text-large .vf-settings__note,
+.vf-text-large .vf-show__month,
+.vf-text-large .vf-search__group,
+.vf-text-large .vf-filter__meta,
+.vf-text-large .vf-profile__server,
+.vf-text-large .vf-bars__label,
+.vf-text-large .vf-field__label {
+	font-size: 24px;
+}
+
+/* ---- Reduce motion (Settings): nothing slides, scrolls or fades; changes happen at once. --------- */
+
+.vf-reduce-motion *,
+.vf-reduce-motion *::before,
+.vf-reduce-motion *::after {
+	transition: none !important;
+	animation-duration: 1ms !important;
+	animation-iteration-count: 1 !important;
+}
+
+/* ---- Diagnostics -------------------------------------------------------------------------------- */
+
+.vf-diag__facts {
+	margin-top: 40px;
+	grid-template-columns: 300px 1fr;
+}
+
+.vf-diag__support {
+	margin: 40px 0 0;
+}
+
+.vf-diag__facts--small {
+	margin-top: 16px;
+	font-size: 22px;
+	grid-row-gap: 10px;
+	color: var(--vf-muted);
+}
+
+.vf-diag__bad {
+	color: #E5A04F;
+}
+
+.vf-diag__actions {
+	margin-top: 48px;
+}
+
+/* After another device moved a paused book: say so, and offer the way back. */
+.vf-player__jump {
+	margin-top: 22px;
+	display: flex;
+	align-items: center;
+	font-size: 22px;
+}
+
+.vf-player__jump > .vf-btn {
+	margin-left: 20px;
+}
+
+.vf-player__jump .vf-btn > svg {
+	margin-right: 8px;
+}
+
+/* ★ Home's seasonal prompt for Year in Review: one quiet band, not a takeover. */
+.vf-yearprompt {
+	margin: 0 66px 40px 0;
+	padding: 28px 36px;
+	border-radius: 24px;
+	background: linear-gradient(90deg, rgba(242, 184, 75, 0.14), rgba(242, 184, 75, 0.03));
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.vf-yearprompt__title {
+	margin-top: 6px;
+	font: 500 40px/1.1 'Newsreader', serif;
+}
+
+/* ---- Playlist queue panel ----------------------------------------------------------------------- */
+
+.vf-queuechip > svg {
+	margin-right: 10px;
+}
+
+.vf-queue__title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-right: 24px;
+}
+
+.vf-queue__actions {
+	margin-top: 24px;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.vf-queue__actions > .vf-btn {
+	margin-left: 0;
+	white-space: nowrap;
+}
+
+.vf-queue__actions > .vf-btn + .vf-btn {
+	margin-top: 12px;
+}
+
+.vf-queue__actions .vf-btn > svg {
+	margin-right: 10px;
+}
+
+/* Leaving is the quieter action. */
+.vf-queue__leave:not(:focus) {
+	background: transparent;
+	color: var(--vf-muted);
+}
+
+.vf-queue__actions > .is-selected:not(:focus) {
+	background: rgba(243, 238, 230, 0.14);
+	color: var(--vf-paper);
 }

@@ -74,6 +74,15 @@ export async function ping (serverUrl: string): Promise<void> {
 	}
 }
 
+/** The server's name and version, and how long it took to answer (ms). Needs no sign-in. */
+export async function serverStatus (serverUrl: string): Promise<{version: string; ms: number}> {
+	const started = Date.now();
+	const res = await http(serverUrl + '/status');
+	const body = await res.json().catch(() => null) as {serverVersion?: string} | null;
+	if (!res.ok || !body) throw errorFor(res.status, 'The server status');
+	return {version: body.serverVersion || '?', ms: Date.now() - started};
+}
+
 export async function login (serverUrl: string, username: string, password: string): Promise<Credentials> {
 	const res = await http(serverUrl + '/login', {
 		method: 'POST',

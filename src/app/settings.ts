@@ -19,7 +19,21 @@ export interface Settings {
 	nightMode: boolean;
 	/** Home rows the listener has switched off (the Continue listening card always shows). */
 	hiddenHomeRows: HomeRowId[];
+	/** Home rows in the listener's order (rows missing here keep their place from HOME_ROWS). */
+	homeRowOrder: HomeRowId[];
+	/** What the screensaver shows: the moving cover and clock, or nothing (a black screen). */
+	screensaver: ScreensaverStyle;
+	/** Larger small text (hints, details, labels) for reading from further away. */
+	textSize: TextSize;
+	/** No sliding, scrolling titles or fades; the screensaver hops instead of drifting. */
+	reduceMotion: boolean;
+	/** Seconds the sleep timer fades the sound out over. */
+	sleepFade: number;
 }
+
+export type ScreensaverStyle = 'cover' | 'dark';
+export type TextSize = 'standard' | 'large';
+export const SLEEP_FADE_CHOICES = [10, 30, 60];
 
 export type HomeRowId = 'in-progress' | 'continue-series' | 'recently-added' | 'listen-again' | 'discover' | 'recent-series' | 'new-episodes';
 
@@ -33,6 +47,40 @@ export const HOME_ROWS: {id: HomeRowId; label: string; hint: string; premium?: b
 	{id: 'listen-again', label: 'Listen again', hint: 'Books you finished a while ago'},
 	{id: 'recent-series', label: 'New series', hint: 'Series added to the library lately'}
 ];
+
+/** Every Home row in the listener's order: their own order first, then any rows they haven't placed. */
+export function orderedHomeRows (settings: Settings): HomeRowId[] {
+	const all = HOME_ROWS.map((r) => r.id);
+	const placed = settings.homeRowOrder.filter((id) => all.indexOf(id) !== -1);
+	all.forEach((id, i) => {
+		if (placed.indexOf(id) !== -1) return;
+		// A row they've never moved goes after the row it follows by default.
+		const before = all.slice(0, i).reverse().filter((b) => placed.indexOf(b) !== -1)[0];
+		placed.splice(before ? placed.indexOf(before) + 1 : 0, 0, id);
+	});
+	return placed;
+}
+
+/** Move a Home row one place up (-1) or down (1); null when it's already at that end. */
+export function moveHomeRow (settings: Settings, id: HomeRowId, dir: 1 | -1): HomeRowId[] | null {
+	const order = orderedHomeRows(settings);
+	const i = order.indexOf(id);
+	const j = i + dir;
+	if (i === -1 || j < 0 || j >= order.length) return null;
+	const next = order.slice();
+	next[i] = order[j];
+	next[j] = id;
+	return next;
+}
+
+export function homeRowsAreDefault (settings: Settings): boolean {
+	return orderedHomeRows(settings).join() === HOME_ROWS.map((r) => r.id).join() && settings.hiddenHomeRows.slice().sort().join() === defaults.hiddenHomeRows.slice().sort().join();
+}
+
+/** The Home rows as they come out of the box. */
+export function defaultHomeRows (): Pick<Settings, 'homeRowOrder' | 'hiddenHomeRows'> {
+	return {homeRowOrder: [], hiddenHomeRows: defaults.hiddenHomeRows.slice()};
+}
 
 export function homeRowShown (settings: Settings, id: HomeRowId): boolean {
 	return settings.hiddenHomeRows.indexOf(id) === -1;
@@ -61,7 +109,12 @@ const defaults: Settings = {
 	seriesAutoplay: true,
 	nightMode: true,
 	// Home stays short until the listener asks for more.
-	hiddenHomeRows: ['listen-again', 'recent-series']
+	hiddenHomeRows: ['listen-again', 'recent-series'],
+	homeRowOrder: [],
+	screensaver: 'cover',
+	textSize: 'standard',
+	reduceMotion: false,
+	sleepFade: 10
 };
 
 function load (): Settings {
@@ -80,6 +133,11 @@ function load (): Settings {
 	if (SKIP_CHOICES.indexOf(merged.skipForward) === -1) merged.skipForward = defaults.skipForward;
 	if (SLEEP_CHOICES.indexOf(merged.sleepDefault) === -1) merged.sleepDefault = defaults.sleepDefault;
 	if (!Array.isArray(merged.hiddenHomeRows)) merged.hiddenHomeRows = defaults.hiddenHomeRows.slice();
+	if (!Array.isArray(merged.homeRowOrder)) merged.homeRowOrder = [];
+	if (merged.screensaver !== 'dark') merged.screensaver = 'cover';
+	if (merged.textSize !== 'large') merged.textSize = 'standard';
+	merged.reduceMotion = merged.reduceMotion === true;
+	if (SLEEP_FADE_CHOICES.indexOf(merged.sleepFade) === -1) merged.sleepFade = defaults.sleepFade;
 	return merged;
 }
 

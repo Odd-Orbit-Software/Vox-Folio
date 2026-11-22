@@ -3,14 +3,22 @@ import {useEffect, useState} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import {normaliseYearStats, summariseYear} from '../app/yearReview';
 import type {YearSummary} from '../app/yearReview';
-import {Button, Cover, Icon} from '../components/controls';
+import {Button, Cover, Icon, Tile} from '../components/controls';
 import {errorTitle} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 
 interface YearReviewProps {
 	client: AbsClient;
 	onDone: () => void;
+	/** Open on this year (Home's prompt); this year otherwise. */
+	initialYear?: number;
+	/** OK on a cover opens that book. */
+	onOpenTitle: (itemId: string, fromKey: string) => void;
+	restoreKey?: string | null;
 }
+
+/* Kept while the app runs (per account), so Back from a book returns to the same year at once. */
+const cache = new WeakMap<AbsClient, {year: number; years: Record<number, YearSummary>}>();
 
 /** "A, B and C" for a short list. */
 function listText (items: string[]): string {
@@ -25,11 +33,11 @@ function yearsOffered (now: Date): number[] {
 }
 
 /** ★ Year in Review: one page per year, from Audiobookshelf's own yearly stats. */
-export default function YearReview ({client, onDone}: YearReviewProps) {
+export default function YearReview ({client, onDone, initialYear, onOpenTitle, restoreKey}: YearReviewProps) {
 	const [now] = useState(() => new Date());
-	const [year, setYear] = useState(() => now.getFullYear());
+	const [year, setYear] = useState(() => initialYear || (cache.get(client) ? cache.get(client)!.year : now.getFullYear()));
 	// Each year is fetched once per visit, so flipping between them is instant.
-	const [years, setYears] = useState<Record<number, YearSummary>>({});
+	const [years, setYears] = useState<Record<number, YearSummary>>(() => (cache.get(client) ? cache.get(client)!.years : {}));
 	const [error, setError] = useState<AbsError | null>(null);
 	const [retry, setRetry] = useState(0);
 
@@ -46,12 +54,16 @@ export default function YearReview ({client, onDone}: YearReviewProps) {
 		};
 	}, [client, year, now, years, retry]);
 
+	useEffect(() => {
+		cache.set(client, {year, years});
+	}, [client, year, years]);
+
 	const s = years[year] || null;
 	const loading = !s && !error;
 	const current = year === now.getFullYear();
 
 	return (
-		<ScreenContainer id="year-review" className="vf-year" focusDeps={[s !== null]}>
+		<ScreenContainer id="year-review" className="vf-year" restoreKey={restoreKey} focusDeps={[s !== null]}>
 			<div className="vf-hint vf-year__back"><Icon name="back" size={24} />Back</div>
 
 			<div className="vf-year__main">
@@ -137,7 +149,9 @@ export default function YearReview ({client, onDone}: YearReviewProps) {
 			{s && s.covers.length > 0 && (
 				<div className={'vf-year__covers vf-year__covers--' + Math.min(12, s.covers.length)} aria-label={'Covers of what you listened to in ' + year}>
 					{s.covers.map((id) => (
-						<Cover key={id} url={client.coverUrl(id, 360)} title="" size={s.covers.length > 4 ? 180 : 260} className="vf-year__cover" />
+						<Tile key={id} className="vf-year__cover" data-focus-key={'cover:' + id} aria-label="Open this book" onClick={() => onOpenTitle(id, 'cover:' + id)}>
+							<Cover url={client.coverUrl(id, 360)} title="" size={s.covers.length > 4 ? 180 : 260} />
+						</Tile>
 					))}
 				</div>
 			)}

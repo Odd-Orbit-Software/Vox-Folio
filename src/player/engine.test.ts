@@ -421,6 +421,17 @@ describe('sleep timer', () => {
 		expect(engine.getState().notice!.text).toMatch(/Sleep timer/);
 	});
 
+	test('a longer fade starts earlier and asks at the same time', async () => {
+		const {audio, engine} = await openEngine();
+		engine.sleepFadeMs = 60 * 1000;
+		engine.setSleep(2);
+		// 75 s in: 45 s left, already fading and asking.
+		playFor(audio, 75, 1_000_000);
+		expect(audio.volume).toBeLessThan(1);
+		expect(audio.volume).toBeGreaterThan(0.5);
+		expect(engine.getState().sleep!.prompt).toBe(true);
+	});
+
 	test('time paused does not count', async () => {
 		const {audio, engine} = await openEngine();
 		engine.setSleep(1);

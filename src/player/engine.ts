@@ -33,7 +33,6 @@ export type SleepState = (
 
 /** "Still listening?" shows this long before the timer stops; the audio fades over the last part. */
 export const SLEEP_PROMPT_MS = 30 * 1000;
-const SLEEP_FADE_MS = 10 * 1000;
 
 export interface PlayerState {
 	status: PlayerStatus;
@@ -144,10 +143,18 @@ export class PlayerEngine {
 	private sleepTick: number | null = null;
 	/** Timer mode's running remainder; published state is only refreshed when something visible changes. */
 	private sleepLeftMs = 0;
+	private remoteJumpTimer: number | null = null;
+	/** How long the sleep timer fades out for (Settings: 10, 30 or 60 s). */
+	sleepFadeMs = 10 * 1000;
 	/** Other devices' sessions already warned about playing at the same time. */
 	private warnedSessions: string[] = [];
 	/** Step back a little on resume, more after longer pauses (settings). */
 	smartRewind = true;
+
+	/** Sleep timer fade length, in seconds (Settings). */
+	setSleepFade (seconds: number): void {
+		this.sleepFadeMs = seconds * 1000;
+	}
 
 	setSmartRewind (on: boolean): void {
 		this.smartRewind = on;
@@ -476,7 +483,8 @@ export class PlayerEngine {
 			remaining = this.state.chapterIndex > sleep.chapterIndex ? 0 : this.chapterRemainingMs(sleep.chapterIndex);
 		}
 		this.sleepTick = now;
-		this.audio.volume = remaining < SLEEP_FADE_MS ? Math.max(0, remaining / SLEEP_FADE_MS) : 1;
+		const fade = this.sleepFadeMs;
+		this.audio.volume = remaining < fade ? Math.max(0, remaining / fade) : 1;
 		if (remaining <= 0) {
 			this.sleepTick = null;
 			this.set({sleep: null});
@@ -485,7 +493,8 @@ export class PlayerEngine {
 			this.notify('Sleep timer: paused at ' + formatClock(this.state.position));
 			return;
 		}
-		const prompt = remaining <= SLEEP_PROMPT_MS;
+		// A long fade starts the question early, so the listener knows why it's getting quieter.
+		const prompt = remaining <= Math.max(SLEEP_PROMPT_MS, fade);
 		const endsAt = now + remaining;
 		// Re-emit when something visible changes, or the deadline drifts noticeably (seek, speed change).
 		const drift = sleep.endsAt ? Math.abs(endsAt - sleep.endsAt) : Infinity;

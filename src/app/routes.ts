@@ -11,7 +11,8 @@ export type Route =
 	| {name: 'player'}
 	| {name: 'settings'}
 	| {name: 'stats'}
-	| {name: 'yearReview'}
+	| {name: 'yearReview'; year?: number}
+	| {name: 'diagnostics'}
 	| {name: 'search'}
 	| {name: 'authors'}
 	| {name: 'author'; authorId: string; authorName: string}
