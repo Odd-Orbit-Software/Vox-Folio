@@ -5,6 +5,7 @@ import {AbsClient, AbsError} from '../abs/client';
 import {progressKey} from '../abs/client';
 import type {LibraryItem, MediaProgress, PodcastEpisode, Shelf} from '../abs/types';
 import {subscribeProgress} from '../app/live';
+import {slimEpisode, slimItem} from '../app/slim';
 import {snoozeYearPrompt} from '../app/yearReview';
 import {episodeDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
@@ -178,7 +179,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 			Object.keys(progress).forEach((k) => {
 				if (progress[k].isFinished === false || items.some((i) => i.id === k)) shown[k] = progress[k];
 			});
-			writeCache(client, {entries, progress: shown});
+			writeCache(client, {entries: entries.map((e) => ({...e, item: slimItem(e.item), episode: e.episode ? slimEpisode(e.episode) : undefined})), progress: shown});
 		}, (e: unknown) => {
 			if (cancelled) return;
 			const err = e instanceof AbsError ? e : new AbsError('server', String(e));
@@ -202,7 +203,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 		}).then((list) => {
 			if (cancelled) return;
 			setShelves(list);
-			writeCache(client, {shelves: list.filter((sh) => SHELVES.some((d) => d.id === sh.id))});
+			writeCache(client, {shelves: list.filter((sh) => SHELVES.some((d) => d.id === sh.id)).map((sh) => ({...sh, entities: sh.entities.map(slimItem)}))});
 		}, () => undefined);
 		return () => {
 			cancelled = true;
@@ -217,7 +218,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 		podcastLibraryId(client).then((id) => (id ? client.recentEpisodes(id, 12) : [])).then((list) => {
 			if (cancelled) return;
 			setEpisodes(list);
-			writeCache(client, {episodes: list.map((e) => ({...e, description: ''}))});
+			writeCache(client, {episodes: list.map((e) => ({...slimEpisode(e), podcast: e.podcast ? {metadata: {title: e.podcast.metadata.title}} : undefined} as PodcastEpisode))});
 		}, () => undefined);
 		return () => {
 			cancelled = true;
