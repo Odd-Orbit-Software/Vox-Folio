@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
+import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -93,6 +93,15 @@ export async function login (serverUrl: string, username: string, password: stri
 		accessToken: data.user.accessToken,
 		refreshToken: data.user.refreshToken
 	};
+}
+
+/** The progress map key: the item for a book, item/episode for a podcast episode. */
+export function progressKey (itemId: string, episodeId?: string | null): string {
+	return episodeId ? itemId + '/' + episodeId : itemId;
+}
+
+function episodePath (episodeId?: string | null): string {
+	return episodeId ? '/' + encodeURIComponent(episodeId) : '';
 }
 
 /** Expiry (ms since epoch) from a JWT's payload, or null if it can't be read. */
@@ -226,22 +235,23 @@ export class AbsClient {
 		return this.request<LibraryItem>('GET', '/api/items/' + encodeURIComponent(itemId) + '?expanded=1', undefined, 'That book');
 	}
 
-	/** The listener's saved position for a book, or null if they haven't started it. */
-	async getProgress (itemId: string): Promise<MediaProgress | null> {
+	/** The listener's saved position for a book (or a podcast episode), or null if they haven't started it. */
+	async getProgress (itemId: string, episodeId?: string | null): Promise<MediaProgress | null> {
 		try {
-			return await this.request<MediaProgress>('GET', '/api/me/progress/' + encodeURIComponent(itemId));
+			return await this.request<MediaProgress>('GET', '/api/me/progress/' + encodeURIComponent(itemId) + episodePath(episodeId));
 		} catch (e) {
 			if (e instanceof AbsError && e.kind === 'notFound') return null;
 			throw e;
 		}
 	}
 
-	/** The listener's saved progress for every book they've started, keyed by item ID. */
+	/** The listener's saved progress for everything they've started: books keyed by item ID, podcast
+	    episodes by progressKey(itemId, episodeId), so an episode never shows as a book's progress. */
 	async progressByItem (): Promise<Record<string, MediaProgress>> {
 		const me = await this.request<{mediaProgress?: MediaProgress[]}>('GET', '/api/me');
 		const out: Record<string, MediaProgress> = {};
 		(me && me.mediaProgress || []).forEach((p) => {
-			out[p.libraryItemId] = p;
+			out[progressKey(p.libraryItemId, p.episodeId)] = p;
 		});
 		return out;
 	}
@@ -251,11 +261,17 @@ export class AbsClient {
 		return (data && data.libraryItems || []).filter((i) => i.mediaType === 'book');
 	}
 
-	async libraries (): Promise<Library[]> {
+	async libraries (mediaType: Library['mediaType'] = 'book'): Promise<Library[]> {
 		const data = await this.request<{libraries: Library[]}>('GET', '/api/libraries');
 		return (data && data.libraries || [])
-			.filter((l) => l.mediaType === 'book')
+			.filter((l) => l.mediaType === mediaType)
 			.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+	}
+
+	/** A podcast library's newest episodes across all shows, newest first. */
+	async recentEpisodes (libraryId: string, limit = 24): Promise<PodcastEpisode[]> {
+		const data = await this.request<{episodes: PodcastEpisode[]}>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/recent-episodes?limit=' + limit);
+		return data && data.episodes || [];
 	}
 
 	/** One page of a library's books. `sort` is an Audiobookshelf sort key such as media.metadata.title. */
@@ -356,13 +372,13 @@ export class AbsClient {
 		return {totalTime: data && data.totalTime || 0, days: data && data.days || {}, today: data && data.today || 0};
 	}
 
-	/** Mark a book finished (or not) for this listener. */
-	setFinished (itemId: string, isFinished: boolean): Promise<void> {
-		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId), {isFinished});
+	/** Mark a book (or a podcast episode) finished, or not, for this listener. */
+	setFinished (itemId: string, isFinished: boolean, episodeId?: string | null): Promise<void> {
+		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId) + episodePath(episodeId), {isFinished});
 	}
 
-	startPlayback (itemId: string, device: DeviceInfo, supportedMimeTypes: string[]): Promise<PlaybackSession> {
-		return this.request<PlaybackSession>('POST', '/api/items/' + encodeURIComponent(itemId) + '/play', {
+	startPlayback (itemId: string, device: DeviceInfo, supportedMimeTypes: string[], episodeId?: string | null): Promise<PlaybackSession> {
+		return this.request<PlaybackSession>('POST', '/api/items/' + encodeURIComponent(itemId) + '/play' + episodePath(episodeId), {
 			deviceInfo: device,
 			forceDirectPlay: false,
 			forceTranscode: false,

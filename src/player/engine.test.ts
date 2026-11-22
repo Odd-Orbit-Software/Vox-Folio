@@ -131,7 +131,7 @@ async function openEngine (c = makeClient(), smartRewind = false) {
 
 test('opens at the server position, in the right file, and starts playing', async () => {
 	const {audio, engine, raw} = await openEngine();
-	expect(raw.startPlayback).toHaveBeenCalledWith('item-1', device, ['audio/mpeg', 'audio/mp4']);
+	expect(raw.startPlayback).toHaveBeenCalledWith('item-1', device, ['audio/mpeg', 'audio/mp4'], null);
 	expect(audio.src).toBe('https://abs.test/f/1?token=t');
 	expect(audio.currentTime).toBe(100);
 	expect(engine.getState().status).toBe('playing');
@@ -528,5 +528,30 @@ describe('closing sessions so listening is recorded', () => {
 		audio.end(); // last file ends
 		await flush();
 		expect(closes).toHaveLength(1);
+	});
+});
+
+describe('podcast episodes', () => {
+	test('opens an episode session and shows the episode under its show', async () => {
+		const c = makeClient({
+			getItem: jest.fn(async () => ({
+				id: 'show-1', libraryId: 'p', mediaType: 'podcast',
+				media: {coverPath: '/c', metadata: {title: 'Behind the Bastards', author: 'Cool Zone Media'}, episodes: [
+					{id: 'ep-2', libraryItemId: 'show-1', title: ' Part Two: Example ', publishedAt: Date.UTC(2026, 10, 19, 10)}
+				]}
+			}))
+		});
+		const audio = new FakeAudio();
+		const engine = new PlayerEngine(c.client, audio as unknown as HTMLAudioElement, device);
+		await engine.open('show-1', true, undefined, 'ep-2');
+		expect(c.raw.startPlayback).toHaveBeenCalledWith('show-1', device, ['audio/mpeg', 'audio/mp4'], 'ep-2');
+		expect(c.raw.getProgress).toHaveBeenCalledWith('show-1', 'ep-2');
+		const s = engine.getState();
+		expect(s.episodeId).toBe('ep-2');
+		expect(s.title).toBe('Part Two: Example');
+		expect(s.author).toBe('Cool Zone Media');
+		expect(s.seriesLine).toBe('Behind the Bastards · 19 Nov 2026');
+		// No series, so no Up Next or series autoplay for episodes.
+		expect(s.series).toBeNull();
 	});
 });

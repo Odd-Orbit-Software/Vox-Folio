@@ -3,7 +3,7 @@ import SpotlightRootDecorator from '@enact/spotlight/SpotlightRootDecorator';
 import {useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react';
 
 import appinfo from '../../webos-meta/appinfo.json';
-import {AbsClient, login, normaliseServerUrl} from '../abs/client';
+import {AbsClient, login, normaliseServerUrl, progressKey} from '../abs/client';
 import type {Credentials} from '../abs/client';
 import type {Bookmark} from '../abs/types';
 import {deviceId} from '../abs/store';
@@ -14,9 +14,11 @@ import type {Profile, ProfileState} from '../app/profiles';
 import {pop, push, reset, TABS} from '../app/routes';
 import type {Entry, Route} from '../app/routes';
 import {nextInSeries} from '../app/series';
+import {podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
 import {getSettings, selectProfileSettings, updateSettings, useSettings} from '../app/settings';
 import type {SeriesEntry} from '../app/series';
+import {PodcastsContext} from '../components/PodcastsContext';
 import {ProfileContext} from '../components/ProfileContext';
 import {Screensaver} from '../components/Screensaver';
 import {Toasts} from '../components/Toasts';
@@ -38,6 +40,8 @@ import Details from '../screens/Details';
 import Home from '../screens/Home';
 import Library from '../screens/Library';
 import Player from '../screens/Player';
+import PodcastShow from '../screens/PodcastShow';
+import Podcasts from '../screens/Podcasts';
 import SeriesDetail from '../screens/SeriesDetail';
 import Search, {presetSearch} from '../screens/Search';
 import Stats from '../screens/Stats';
@@ -145,10 +149,11 @@ function makeSession (profile: Profile): Session {
 }
 
 /** The profile a book should open for: whoever saved progress in it most recently, else the active one. */
-async function profileForItem (itemId: string): Promise<string | null> {
+async function profileForItem (key: string): Promise<string | null> {
 	const {profiles, activeId} = profileState;
 	if (profiles.length < 2) return activeId || (profiles[0] ? profiles[0].id : null);
-	const found = await Promise.all(profiles.map((p) => clientFor(p).getProgress(itemId).catch(() => null)));
+	const [itemId, episodeId] = key.split('/');
+	const found = await Promise.all(profiles.map((p) => clientFor(p).getProgress(itemId, episodeId).catch(() => null)));
 	let best: string | null = null;
 	let bestAt = -1;
 	found.forEach((progress, i) => {
@@ -184,6 +189,19 @@ function App () {
 
 	const client = session ? session.client : null;
 	const engine = session ? session.engine : null;
+	// ★ Podcasts appear in the rail when the account has a podcast library.
+	const [hasPodcasts, setHasPodcasts] = useState(false);
+	useEffect(() => {
+		let cancelled = false;
+		if (!client || !isPremium()) return undefined;
+		podcastLibraryId(client).then((id) => {
+			if (!cancelled) setHasPodcasts(Boolean(id));
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+			setHasPodcasts(false);
+		};
+	}, [client]);
 	const creds = client ? client.credentials : null;
 	const currentProfile = session ? profiles.profiles.filter((p) => p.id === session.profileId)[0] || null : null;
 	const player = usePlayer(engine);
@@ -276,13 +294,15 @@ function App () {
 		setStack(reset(profileState.profiles.length && !message ? {name: 'profiles'} : {name: 'setup'}));
 	}, []);
 
-	const openBook = useCallback((target: PlayerEngine, itemId: string, opts: {fromKey?: string | null; startAt?: number} = {}) => {
+	/** Open a book, or a podcast episode when `key` is "<show>/<episode>" (see progressKey). */
+	const openBook = useCallback((target: PlayerEngine, key: string, opts: {fromKey?: string | null; startAt?: number} = {}) => {
 		const previous = target.getState();
-		if (previous.itemId && previous.itemId !== itemId && previous.title) {
+		if (previous.itemId && progressKey(previous.itemId, previous.episodeId) !== key && previous.title) {
 			pushToast('Saved your place in ' + previous.title);
 		}
 		showPlayer(opts.fromKey);
-		target.open(itemId, true, opts.startAt);
+		const [itemId, episodeId] = key.split('/');
+		target.open(itemId, true, opts.startAt, episodeId || null);
 	}, [pushToast, showPlayer]);
 
 	/** Every title request from outside (Polaris, a relaunch) comes through here. With several
@@ -291,7 +311,7 @@ function App () {
 		const run = (current: Session | null) => {
 			const action = decideLaunch(itemId, {
 				signedIn: Boolean(current),
-				currentItemId: current ? current.engine.getState().itemId : null
+				currentItemId: current && current.engine.getState().itemId ? progressKey(current.engine.getState().itemId as string, current.engine.getState().episodeId) : null
 			});
 			switch (action.type) {
 				case 'defer':
@@ -454,7 +474,7 @@ function App () {
 					if (on && hasNext && no.indexOf(s.itemId) === -1) {
 						playNext();
 					} else if (current) {
-						current.client.setFinished(s.itemId, true).catch(() => undefined);
+						current.client.setFinished(s.itemId, true, s.episodeId).catch(() => undefined);
 						pushToast('Finished ' + s.title);
 					}
 				}
@@ -567,6 +587,11 @@ function App () {
 		if (TABS.indexOf(name) !== -1) setStack(reset({name} as Route));
 	};
 	const onSettings = () => onTab('settings');
+	const openEpisode = (itemId: string, episodeId: string, fromKey: string) => {
+		if (!engine) return;
+		if (player.itemId === itemId && player.episodeId === episodeId && player.status !== 'error') showPlayer(fromKey);
+		else openBook(engine, progressKey(itemId, episodeId), {fromKey});
+	};
 	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
 
 	const profileInfo = currentProfile ? {
@@ -577,6 +602,7 @@ function App () {
 
 	return (
 		<ProfileContext.Provider value={profileInfo}>
+		<PodcastsContext.Provider value={hasPodcasts}>
 		<div className="vf-stage">
 			{route.name === 'profiles' && (
 				<Profiles
@@ -634,6 +660,27 @@ function App () {
 					onOpenSeries={(libraryId, seriesId, seriesName, fromKey) => go({name: 'seriesDetail', libraryId, seriesId, seriesName}, fromKey)}
 					onOpenAuthor={(authorId, authorName, fromKey) => go({name: 'author', authorId, authorName}, fromKey)}
 					onOpenNarrator={(libraryId, name, fromKey) => go({name: 'books', title: name, source: {kind: 'narrator', libraryId, name}}, fromKey)}
+				/>
+			)}
+			{route.name === 'podcasts' && client && engine && (
+				<Podcasts
+					client={client}
+					restoreKey={top.focusKey}
+					onTab={onTab}
+					onSettings={onSettings}
+					onPlayEpisode={openEpisode}
+					onOpenShow={(itemId, title, fromKey) => go({name: 'podcast', itemId, title}, fromKey)}
+				/>
+			)}
+			{route.name === 'podcast' && client && engine && (
+				<PodcastShow
+					key={route.itemId}
+					client={client}
+					itemId={route.itemId}
+					title={route.title}
+					player={player}
+					restoreKey={top.focusKey}
+					onPlayEpisode={openEpisode}
 				/>
 			)}
 			{route.name === 'authors' && client && (
@@ -723,11 +770,11 @@ function App () {
 						if (player.itemId) setDeclined((d) => d.concat(player.itemId as string));
 					}}
 					onHome={() => setStack(reset({name: 'home'}))}
-					onRetry={() => player.itemId && openBook(engine, player.itemId)}
+					onRetry={() => player.itemId && openBook(engine, progressKey(player.itemId, player.episodeId))}
 					skipBack={settings.skipBack}
 					skipForward={settings.skipForward}
 					sleepDefault={settings.sleepDefault}
-					bookmarks={bookmarks && bookmarks.itemId === player.itemId ? bookmarks.list : []}
+					bookmarks={bookmarks && bookmarks.itemId === player.itemId && !player.episodeId ? bookmarks.list : []}
 					onAddBookmark={addBookmark}
 					onRemoveBookmark={removeBookmark}
 				/>
@@ -755,6 +802,7 @@ function App () {
 			<Toasts toasts={toasts} />
 			{asleep && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} cornerSoon={devCornerSoon} />}
 		</div>
+		</PodcastsContext.Provider>
 		</ProfileContext.Provider>
 	);
 }

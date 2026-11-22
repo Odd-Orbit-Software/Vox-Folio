@@ -73,11 +73,15 @@ export function exitApp (): void {
 }
 
 /** The Audiobookshelf library item a launch asks for, or null. Polaris sends `{abs: "<item id>"}`. */
+/** The requested title: a book's item ID, or "<show item ID>/<episode ID>" when an `episode` is also given
+    (a podcast episode, e.g. from a Polaris Continue card). */
 export function requestedItemId (params: LaunchParams): string | null {
 	const value = params.abs;
 	if (typeof value !== 'string') return null;
 	const id = value.trim();
-	return id ? id : null;
+	if (!id) return null;
+	const episode = typeof params.episode === 'string' ? params.episode.trim() : '';
+	return episode ? id + '/' + episode : id;
 }
 
 /** LG remote key codes (keyCode on keydown). */

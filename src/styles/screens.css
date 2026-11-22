@@ -2767,9 +2767,64 @@
 
 .vf-sleep__autoplay {
 	margin-top: 28px;
-	gap: 14px;
 }
 
 .vf-sleep__autoplay svg {
 	margin-right: 14px;
+}
+
+/* ---- podcasts ------------------------------------------------------------------------------- */
+
+.vf-podcasts__rows {
+	top: 150px;
+}
+
+.vf-show__head {
+	justify-content: flex-start;
+	align-items: center;
+}
+
+/* Margins, not flex gap: the TV's Chromium 79 doesn't support gap in flexbox. */
+.vf-show__cover {
+	flex: none;
+	margin-right: 40px;
+	border-radius: 14px;
+}
+
+.vf-show__intro {
+	min-width: 0;
+	flex: 1;
+}
+
+.vf-show__intro .vf-series__title {
+	font-size: 64px;
+}
+
+.vf-show__desc {
+	margin: 14px 0 0;
+	max-width: 1300px;
+	font-size: 24px;
+	line-height: 1.45;
+	color: var(--vf-muted);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.vf-show__viewport {
+	top: 330px;
+}
+
+.vf-show__date {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.vf-show__month {
+	margin-top: 6px;
+	font: 500 20px/1 'Figtree', sans-serif;
+	letter-spacing: 0.04em;
+	color: var(--vf-muted);
 }

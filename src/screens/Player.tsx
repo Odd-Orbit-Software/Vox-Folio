@@ -325,8 +325,8 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 			else if (isBackKey(code) && showUpNext) onDeclineNext();
 			else if (isBackKey(code) && preview !== null) setPreview(null);
 			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
-			else if (code === Keys.RED) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
-			else if (code === Keys.BLUE) onAddBookmark();
+			else if (code === Keys.RED && (!player.episodeId || player.chapters.length > 0)) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
+			else if (code === Keys.BLUE && !player.episodeId) onAddBookmark();
 			else if (code === Keys.YELLOW) setPanel((o) => (o === 'sleep' ? 'none' : 'sleep'));
 			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
 			else if (code === Keys.CH_DOWN && panel === 'none') engine.previousChapter();
@@ -338,7 +338,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [engine, panel, preview, showUpNext, player.chapters.length, onDeclineNext, onAddBookmark]);
+	}, [engine, panel, preview, showUpNext, player.chapters.length, player.episodeId, onDeclineNext, onAddBookmark]);
 
 	// When a panel closes, put focus back on the button that opened it.
 	const wasOpen = useRef<Panel>('none');
@@ -456,7 +456,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 								? 'Chapter ' + (p.chapterIndex + 1) + ' · ' + formatClock(p.position - chapter.start) + ' / ' + formatClock(chapter.end - chapter.start)
 								: ''}
 					</span>
-					<span>{Math.floor(percent) + '% of book'}</span>
+					<span>{Math.floor(percent) + (p.episodeId ? '% of episode' : '% of book')}</span>
 				</div>
 				<Tile
 					className="vf-scrub"
@@ -500,12 +500,17 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						<Button variant="chip" data-focus-key="speed" onClick={() => setPanel('speed')}>
 							<span className="vf-dot vf-dot--green" />{formatRate(p.rate)}
 						</Button>
-						<Button variant="icon" className="vf-round vf-round--small" aria-label="Add a bookmark here" data-focus-key="bookmark" onClick={onAddBookmark}>
-							<Icon name="bookmark" size={28} /><span className="vf-dot vf-dot--blue vf-round__dot" />
-						</Button>
-						<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel(p.chapters.length ? 'chapters' : 'bookmarks')}>
-							<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : 'Bookmarks'}
-						</Button>
+						{/* Bookmarks belong to a whole item on the server, so podcast episodes don't get them. */}
+						{!p.episodeId && (
+							<Button variant="icon" className="vf-round vf-round--small" aria-label="Add a bookmark here" data-focus-key="bookmark" onClick={onAddBookmark}>
+								<Icon name="bookmark" size={28} /><span className="vf-dot vf-dot--blue vf-round__dot" />
+							</Button>
+						)}
+						{(!p.episodeId || p.chapters.length > 0) && (
+							<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel(p.chapters.length ? 'chapters' : 'bookmarks')}>
+								<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : 'Bookmarks'}
+							</Button>
+						)}
 					</div>
 				</div>
 			</div>

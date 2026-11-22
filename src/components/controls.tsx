@@ -167,6 +167,7 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	const common = {width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true} as const;
 	const stroke = {fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'} as const;
 	switch (name) {
+		case 'podcast': return <svg {...common}><g {...stroke}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" /></g></svg>;
 		case 'bookmark': return <svg {...common}><path {...stroke} d="M6 3h12v18l-6-4-6 4z" /></svg>;
 		case 'close': return <svg {...common}><path {...stroke} d="M6 6l12 12M18 6L6 18" /></svg>;
 		case 'search': return <svg {...common}><g {...stroke}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></g></svg>;
@@ -196,4 +197,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'podcast' | 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

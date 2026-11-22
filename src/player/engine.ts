@@ -10,7 +10,7 @@
 
 import {AbsError} from '../abs/client';
 import type {AbsClient, DeviceInfo} from '../abs/client';
-import type {AudioTrack, Chapter, PlaybackSession, SeriesRef} from '../abs/types';
+import type {AudioTrack, Chapter, PlaybackSession, PodcastEpisode, SeriesRef} from '../abs/types';
 import {loadPlaybackRate, savePlaybackRate} from '../abs/store';
 import {PlayRateController} from '../platform/playRate';
 import {
@@ -38,6 +38,8 @@ const SLEEP_FADE_MS = 10 * 1000;
 export interface PlayerState {
 	status: PlayerStatus;
 	itemId: string | null;
+	/** Set when playing a podcast episode (itemId is then the show). */
+	episodeId: string | null;
 	title: string;
 	author: string;
 	narrator: string;
@@ -71,6 +73,19 @@ const ADVANCED_THRESHOLD_S = 5;
 
 const MIME_CANDIDATES = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/flac', 'audio/ogg', 'audio/webm', 'audio/wav'];
 
+const EPISODE_DATE = {day: 'numeric', month: 'short', year: 'numeric'} as const;
+
+/** "Behind the Bastards · 19 Nov 2026" over an episode's title in the player. */
+export function episodeLine (show: string, episode: PodcastEpisode | null): string {
+	const at = episode && episode.publishedAt;
+	if (!at) return show;
+	try {
+		return show + ' · ' + new Date(at).toLocaleDateString('en-GB', EPISODE_DATE);
+	} catch {
+		return show;
+	}
+}
+
 export function supportedMimeTypes (audio: HTMLAudioElement): string[] {
 	return MIME_CANDIDATES.filter((t) => audio.canPlayType(t) !== '');
 }
@@ -78,6 +93,7 @@ export function supportedMimeTypes (audio: HTMLAudioElement): string[] {
 export const idlePlayerState: PlayerState = {
 	status: 'idle',
 	itemId: null,
+	episodeId: null,
 	title: '',
 	author: '',
 	narrator: '',
@@ -188,20 +204,20 @@ export class PlayerEngine {
 
 	// ---- opening and closing ----------------------------------------------------------------------
 
-	/** Start a session for a book at the server's saved position (or `startAt`, e.g. 0 to start over).
-	    Closes any current session first. */
-	async open (itemId: string, autoplay = true, startAt?: number): Promise<void> {
+	/** Start a session for a book (or a podcast episode, with `episodeId`) at the server's saved position,
+	    or at `startAt` (e.g. 0 to start over). Closes any current session first. */
+	async open (itemId: string, autoplay = true, startAt?: number, episodeId: string | null = null): Promise<void> {
 		const token = ++this.openToken;
 		await this.close();
 		if (token !== this.openToken) return;
 
-		this.set({...idlePlayerState, rate: this.state.rate, sleep: this.state.sleep, status: 'loading', itemId});
+		this.set({...idlePlayerState, rate: this.state.rate, sleep: this.state.sleep, status: 'loading', itemId, episodeId});
 		this.pausedAt = null;
 		try {
 			const [item, session, progress] = await Promise.all([
 				this.client.getItem(itemId),
-				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio)),
-				startAt === undefined ? this.client.getProgress(itemId).catch(() => null) : Promise.resolve(null)
+				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio), episodeId),
+				startAt === undefined ? this.client.getProgress(itemId, episodeId).catch(() => null) : Promise.resolve(null)
 			]);
 			if (token !== this.openToken) {
 				this.client.closeSession(session.id).catch(() => undefined);
@@ -210,12 +226,13 @@ export class PlayerEngine {
 			const tracks = (session.audioTracks || []).slice().sort((a, b) => a.startOffset - b.startOffset);
 			if (!tracks.length) {
 				this.client.closeSession(session.id).catch(() => undefined);
-				throw new AbsError('notFound', 'This book has no audio files Vox Folio can play.');
+				throw new AbsError('notFound', episodeId ? 'This episode has no audio Vox Folio can play.' : 'This book has no audio files Vox Folio can play.');
 			}
 			this.session = session;
 			this.tracks = tracks;
 			const md = item.media.metadata;
-			const series = md.series && md.series[0];
+			const episode = episodeId ? (item.media.episodes || []).find((e) => e.id === episodeId) || null : null;
+			const series = !episodeId && md.series ? md.series[0] : undefined;
 			const duration = session.duration || bookDuration(tracks);
 			let position = clamp(startAt !== undefined ? startAt : session.currentTime || 0, 0, duration);
 			// Coming back to a book after a while: step back a little so the sentence makes sense.
@@ -224,10 +241,11 @@ export class PlayerEngine {
 			}
 			this.lastSyncOk = Date.now();
 			this.set({
-				title: md.title || session.displayTitle,
-				author: md.authorName || session.displayAuthor || '',
-				narrator: md.narratorName || '',
-				seriesLine: series ? series.name + (series.sequence ? ' · Book ' + series.sequence : '') : '',
+				// An episode shows its own title, with the show (and its date) where a book shows its series.
+				title: episodeId ? (episode ? episode.title.trim() : session.displayTitle) : md.title || session.displayTitle,
+				author: episodeId ? md.author || md.title || session.displayAuthor || '' : md.authorName || session.displayAuthor || '',
+				narrator: episodeId ? '' : md.narratorName || '',
+				seriesLine: episodeId ? episodeLine(md.title, episode) : series ? series.name + (series.sequence ? ' · Book ' + series.sequence : '') : '',
 				series: series || null,
 				libraryId: item.libraryId,
 				coverUrl: item.media.coverPath ? this.client.coverUrl(itemId) : '',
@@ -284,8 +302,8 @@ export class PlayerEngine {
 		this.set({status: 'loading'});
 		try {
 			const [session, progress] = await Promise.all([
-				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio)),
-				this.client.getProgress(itemId).catch(() => null)
+				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio), this.state.episodeId),
+				this.client.getProgress(itemId, this.state.episodeId).catch(() => null)
 			]);
 			if (token !== this.openToken) {
 				this.client.closeSession(session.id).catch(() => undefined);
@@ -495,7 +513,7 @@ export class PlayerEngine {
 		if (!session && this.suspendedAt !== null && this.state.itemId) {
 			// Suspended: show a newer position from another device straight away.
 			try {
-				const progress = await this.client.getProgress(this.state.itemId);
+				const progress = await this.client.getProgress(this.state.itemId, this.state.episodeId);
 				if (progress && progress.lastUpdate > this.suspendedAt + 1000 && Math.abs(progress.currentTime - this.state.position) > ADVANCED_THRESHOLD_S) {
 					this.seek(progress.currentTime);
 					this.suspendedAt = Date.now();
@@ -688,7 +706,7 @@ export class PlayerEngine {
 	    overwrite it with ours. After an outage only a position further on counts (`requireAhead`);
 	    when resuming a paused book, any newer position does. Returns true when it moved. */
 	private async adoptNewerServerPosition (itemId: string, requireAhead: boolean): Promise<boolean> {
-		const progress = await this.client.getProgress(itemId);
+		const progress = await this.client.getProgress(itemId, this.state.episodeId);
 		if (!progress) return false;
 		const newer = progress.lastUpdate > this.lastSyncOk;
 		const delta = progress.currentTime - this.state.position;

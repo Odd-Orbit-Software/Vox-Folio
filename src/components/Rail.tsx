@@ -6,6 +6,7 @@ import mark from '../assets/vox-folio-mark.svg';
 import {Keys} from '../platform/webos';
 import {initials} from '../app/profiles';
 import {Button, Icon} from './controls';
+import {useHasPodcasts} from './PodcastsContext';
 import {useProfileInfo} from './ProfileContext';
 import type {IconName} from './controls';
 
@@ -14,7 +15,8 @@ const TABS: {name: Route['name']; label: string; icon: IconName}[] = [
 	{name: 'search', label: 'Search', icon: 'search'},
 	{name: 'library', label: 'Library', icon: 'library'},
 	{name: 'series', label: 'Series', icon: 'series'},
-	{name: 'authors', label: 'Authors', icon: 'authors'}
+	{name: 'authors', label: 'Authors', icon: 'authors'},
+	{name: 'podcasts', label: 'Podcasts', icon: 'podcast'}
 ];
 
 /** True when no focusable element sits to the left of `el` in the same row (vertically overlapping). */
@@ -36,6 +38,8 @@ function isLeftmostInRow (el: Element, scope: Element): boolean {
 export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab: (name: Route['name']) => void; onSettings: () => void}) {
 	const nav = useRef<HTMLElement>(null);
 	const profile = useProfileInfo();
+	const hasPodcasts = useHasPodcasts();
+	const tabs = TABS.filter((t) => t.name !== 'podcasts' || hasPodcasts || active === 'podcasts');
 
 	// The last thing focused in the screen's content, so Right from the rail returns to it
 	// instead of whatever happens to sit nearest.
@@ -88,7 +92,7 @@ export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab
 				</Button>
 			)}
 			<div className="vf-rail__tabs">
-				{TABS.map((t) => (
+				{tabs.map((t) => (
 					<Button
 						key={t.name}
 						variant="icon"

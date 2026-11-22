@@ -16,7 +16,9 @@ export type Route =
 	| {name: 'author'; authorId: string; authorName: string}
 	| {name: 'collections'; libraryId: string}
 	| {name: 'books'; title: string; source: BookSource}
-	| {name: 'about'};
+	| {name: 'about'}
+	| {name: 'podcasts'}
+	| {name: 'podcast'; itemId: string; title: string};
 
 /** Where a plain list of books comes from. */
 export type BookSource =
@@ -31,7 +33,7 @@ export interface Entry {
 }
 
 /** Screens reachable from the side rail. Back from any of them goes Home (or to the player). */
-export const TABS: Route['name'][] = ['home', 'search', 'library', 'series', 'authors', 'settings'];
+export const TABS: Route['name'][] = ['home', 'search', 'library', 'series', 'authors', 'podcasts', 'settings'];
 
 export function entry (route: Route): Entry {
 	return {route, focusKey: null};

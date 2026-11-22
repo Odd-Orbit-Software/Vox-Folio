@@ -86,12 +86,37 @@ export interface LibraryItem {
 		duration?: number;
 		numAudioFiles?: number;
 		numChapters?: number;
-		metadata: BookMetadata;
+		/** Podcasts: a show's title is metadata.title and its host metadata.author. */
+		metadata: BookMetadata & {author?: string};
+		/** Podcasts only. Expanded items carry the episodes; listings only the count. */
+		numEpisodes?: number;
+		episodes?: PodcastEpisode[];
 	};
+	/** Podcast items on progress shelves: the episode in progress. */
+	recentEpisode?: PodcastEpisode;
+}
+
+export interface PodcastEpisode {
+	id: string;
+	libraryItemId: string;
+	title: string;
+	subtitle?: string;
+	/** HTML from the feed. */
+	description?: string;
+	/** ms since epoch, or null when the feed gave no date. */
+	publishedAt?: number | null;
+	duration?: number;
+	season?: string;
+	episode?: string;
+	episodeType?: string;
+	/** On recent-episodes listings. */
+	podcast?: {metadata: {title: string; author?: string}};
 }
 
 export interface MediaProgress {
 	libraryItemId: string;
+	/** Set for a podcast episode's progress. */
+	episodeId?: string | null;
 	currentTime: number;
 	duration: number;
 	progress: number;
