@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+    branches: [main, features]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Production build, then the Chromium 79 (ES2019) syntax check.
+      - run: npm run build
+      - name: Package the IPK
+        run: npx -y -p @webos-tools/cli ares-package dist -o build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vox-folio-ipk
+          path: build/*.ipk
+          if-no-files-found: error

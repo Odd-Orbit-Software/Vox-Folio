@@ -1,0 +1,32 @@
+title: Vox Folio
+description: An Audiobookshelf player for LG webOS TVs, by Odd Orbit Software.
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+color_scheme: dark
+logo: /images/vox-folio-mark.svg
+url: https://pmck91.github.io
+baseurl: /Vox-Folio
+
+search_enabled: true
+heading_anchors: true
+
+aux_links:
+  GitHub: https://github.com/pmck91/Vox-Folio
+  Releases: https://github.com/pmck91/Vox-Folio/releases
+
+mermaid:
+  version: "10.9.1"
+
+plugins:
+  - jekyll-remote-theme
+
+# Working notes stay in the repository, off the site.
+exclude:
+  - plans/
+
+footer_content: "Vox Folio is made by <a href=\"https://oddorbit.software\">Odd Orbit Software</a>."
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

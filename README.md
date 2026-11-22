@@ -1,57 +1,67 @@
-# Vox Folio
+<p align="center">
+  <img src="docs/images/vox-folio-mark.svg" alt="Vox Folio" width="120">
+</p>
 
-An Audiobookshelf player for LG webOS TVs, by [Odd Orbit Software](https://oddorbit.software). Built with Enact (core, spotlight and ui only, without a theme) and TypeScript. The plans are in [`docs/plans/`](docs/plans/).
+<h1 align="center">Vox Folio</h1>
 
-## Develop
+<p align="center">
+  Your Audiobookshelf library on the big screen.<br>
+  An audiobook and podcast player for LG webOS TVs, made for the remote and the sofa.
+</p>
+
+<p align="center">
+  <a href="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml"><img src="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml/badge.svg" alt="Latest build"></a>
+  <a href="https://github.com/pmck91/Vox-Folio/releases/latest"><img src="https://img.shields.io/github/v/release/pmck91/Vox-Folio?label=release" alt="Latest release"></a>
+  <a href="https://pmck91.github.io/Vox-Folio/"><img src="https://img.shields.io/badge/docs-read-F2B84B" alt="Documentation"></a>
+</p>
+
+<p align="center">
+  <a href="https://pmck91.github.io/Vox-Folio/"><b>Documentation</b></a> ·
+  <a href="https://github.com/pmck91/Vox-Folio/releases"><b>Releases</b></a> ·
+  <a href="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml"><b>Latest CI build</b></a>
+</p>
+
+![Home](docs/images/home.jpg)
+
+## Pick up where you left off
+
+Vox Folio signs in to your own Audiobookshelf server and keeps your place in step with every other app you use. Pause on your phone, press play on the TV, and the book carries on from the same sentence.
+
+| | |
+| --- | --- |
+| ![The player](docs/images/player.jpg) | ![The library](docs/images/library.jpg) |
+| ![A podcast](docs/images/podcast.jpg) | ![Chapters and the playlist](docs/images/chapters.jpg) |
+
+## What it does
+
+- **Listen properly.** Chapters, bookmarks, a sleep timer that fades out gently, and speeds from 0.5× to 2× with the pitch kept natural.
+- **Live sync.** Positions move between devices as they happen, with an undo if you didn't mean it.
+- **Browse the way you think.** Home rows you choose and order, a library with filters, series, authors, collections and search.
+- **Series and playlists keep going.** The next book or episode starts on its own, with an Up Next card first.
+- **Podcasts.** Shows, new episodes, mark played, and their own playback speed.
+- **Made for a TV.** Every control works with the D-pad, the coloured buttons have a guide, and the screensaver can turn the screen fully black for OLED panels.
+- **Shared TVs.** Profiles for everyone in the house, each with their own place, settings and Year in Review.
+
+## Get it
+
+Download the latest `.ipk` from [Releases](https://github.com/pmck91/Vox-Folio/releases), or every build from [CI](https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml), and install it on a TV in Developer Mode or with the Homebrew Channel. The [installation guide](https://pmck91.github.io/Vox-Folio/user/) has the steps.
+
+You'll need your own [Audiobookshelf](https://www.audiobookshelf.org) server. Vox Folio is tested with 2.37, and tells you if a server is too old.
+
+## Build it
 
 ```sh
 npm install
-npm test          # unit tests (engine, client, launch handling, timeline)
-npm run typecheck
-npm run build     # production build into dist/, then the Chromium 79 syntax check
-npm run serve     # desktop browser; launch params come from the query string, e.g. ?abs=<item id>
-                  # (a desktop browser needs --disable-web-security: the server sends no CORS headers)
+npm test
+npm run build      # production build into dist/, then the Chromium 79 syntax check
+npm run package    # build/…ipk
 ```
 
-## Deploy to the rooted TV
+How it fits together, the webOS quirks and how they were solved are in the [developer guide](https://pmck91.github.io/Vox-Folio/dev/).
 
-`TV_HOST` and `TV_KEY` come from `./tv.conf`, or from `../polaris/tv.conf` if that's missing. Both files are git-ignored.
+---
 
-```sh
-tools/deploy.sh [--no-build] ['<launch params json>']   # build, copy over SSH, install, launch
-tools/tv-launch.sh [--cold] '{"abs":"<item id>"}'        # launch or relaunch like Polaris does
-tools/tv-screenshot.sh out.png                          # capture the TV screen
-```
-
-The scripts below exercise and check the real server with the test account in `.abs-test.env` (git-ignored: `VOX_ABS_URL`, `VOX_ABS_USER`, `VOX_ABS_PASS`). Avoid naming that file `.env.local`, because Enact's build loads it.
-
-```sh
-tools/abs-progress.sh <item id>              # what the server has saved
-tools/abs-simulate-phone.sh <item id> <secs> # act as another device saving a position
-```
-
-### Development launch params
-
-These are honoured only when `probe` is also present, so a normal launch never triggers them. Run `tools/probe_listener.py` (port 8766) to receive the reports.
-
-| Param | Effect |
-| --- | --- |
-| `probe` | URL to post diagnostics to: uncaught errors, sync failures, audio element state |
-| `server` | With `probe`, checks what the TV's engine allows against that server (CORS and so on) |
-| `devLogin` | `{server, username, password}`: signs in without typing on the TV |
-| `keys` | Replays remote presses, e.g. `"down,ok,wait,green,ok,back"` |
-| `searchText` | Pre-fills the Search box, since replayed keys can't type |
-| `idle` | Seconds of no input before the screensaver appears, for testing. Normally it appears only when the TV asks |
-
-## Things this TV taught us
-
-- **The engine is Chromium 79** (`Chrome/79.0.3945.79`). Enact transpiles only `@enact/*`, so `npm run build` parses the bundle as ES2019 and fails on `?.` or `??` from dependencies. Avoid flexbox `gap`, `inset`, `aspect-ratio` and `:focus-visible` in CSS.
-- **Enact's px-to-rem conversion is off** (`"ri": false` in package.json). Left on, it divides every px value by 24 against the browser's 16px root, so the 1920×1080 layout rendered at two-thirds size.
-- **CORS doesn't apply.** The app runs from `file://` and talks to Audiobookshelf directly, even though the server sends no CORS headers.
-- **Playback speed must go through the TV's media service.** Any `playbackRate` other than 1 mutes the audio. `src/platform/playRate.ts` calls `luna://com.webos.media/setPlayRate` with `audioOutput: true` on the element's pipeline (`el.mediaId`). Sound stays on, pitch-corrected.
-- **The `<audio>` element has to be in the document**, and it is.
-- **Screensaver:** webOS asks registered apps before starting its own (`tvpower/power/registerScreenSaverRequest`). Vox Folio says no while it's visible and shows its own drifting screensaver (with the time) instead. After an hour on ours with nothing playing, it lets the TV's power-saving take over. The press that wakes it is swallowed.
-- **Audiobookshelf 2.37 auth:** log in with `x-return-tokens: true` to get a refresh token. Each refresh rotates it, so refreshes are serialised and every new pair is saved. Access tokens last 1 h, and the token in audio URLs is refreshed when the stream errors.
-- **Session `sync` and `close` answer with plain-text `OK`**, not JSON.
-- **Listening time goes in `timeListened`** (the seconds since the last sync), not `timeListening`. With the wrong name, the server still saves the position and answers 200 but records no listening time, and a session with none is never saved to history.
-- **Sessions only count once closed.** The app closes them when it's hidden or exits, after 10 paused minutes, and at the end of a book; Play then opens a new one.
+<p align="center">
+  <a href="https://oddorbit.software"><img src="docs/images/odd-orbit.png" alt="Odd Orbit Software" width="160"></a><br>
+  Made by <a href="https://oddorbit.software">Odd Orbit Software</a>
+</p>
