@@ -3512,3 +3512,72 @@
 	background: rgba(243, 238, 230, 0.14);
 	color: var(--vf-paper);
 }
+
+/* ---- Remote buttons guide ------------------------------------------------------------------------ */
+
+.vf-remote__groups {
+	margin-top: 36px;
+	display: flex;
+}
+
+.vf-remote__group {
+	flex: 1;
+	min-width: 0;
+}
+
+.vf-remote__group + .vf-remote__group {
+	margin-left: 48px;
+}
+
+.vf-remote__group:first-child {
+	flex: 1.1;
+}
+
+.vf-remote__list {
+	margin: 16px 0 0;
+}
+
+.vf-remote__row {
+	display: flex;
+	align-items: flex-start;
+	margin-bottom: 18px;
+}
+
+.vf-remote__row dt {
+	flex: none;
+	width: 170px;
+}
+
+.vf-keycap > svg + svg {
+	margin-left: 4px;
+}
+
+.vf-remote__row dd {
+	margin: 4px 0 0;
+	font-size: 24px;
+	line-height: 1.35;
+	color: var(--vf-paper);
+}
+
+/* A remote key, drawn as a small cap; coloured keys carry their dot. */
+.vf-keycap {
+	display: inline-flex;
+	align-items: center;
+	height: 40px;
+	padding: 0 16px;
+	border-radius: 20px;
+	background: var(--vf-raised);
+	font-size: 20px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.vf-tab {
+	white-space: nowrap;
+}
+
+.vf-panel__foot {
+	margin: 16px 0 0;
+	font-size: 22px;
+	color: var(--vf-muted);
+}

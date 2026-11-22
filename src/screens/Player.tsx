@@ -132,25 +132,41 @@ interface NavPanelProps {
 	current: number;
 	bookmarks: Bookmark[];
 	position: number;
-	startTab: 'chapters' | 'bookmarks';
+	startTab: NavTab;
 	onPick: (time: number) => void;
 	onAddBookmark: () => void;
 	onRemoveBookmark: (b: Bookmark) => void;
+	/** Podcast episodes have no bookmarks tab. */
+	episode: boolean;
+	/** While a playlist plays: its entries, as a third tab. */
+	queue: QueueView | null;
+	onQueuePick: (key: string) => void;
 }
 
-/** Chapters and bookmarks, one panel with two tabs (Red opens it on Chapters). */
-function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, onAddBookmark, onRemoveBookmark}: NavPanelProps) {
-	const [tab, setTab] = useState<'chapters' | 'bookmarks'>(chapters.length ? startTab : 'bookmarks');
+type NavTab = 'chapters' | 'bookmarks' | 'playlist';
+
+/** Chapters, bookmarks and (in a playlist) the playlist: one panel with tabs. Red opens it. */
+function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, onAddBookmark, onRemoveBookmark, episode, queue, onQueuePick}: NavPanelProps) {
+	const tabs: NavTab[] = [];
+	if (chapters.length) tabs.push('chapters');
+	if (!episode) tabs.push('bookmarks');
+	if (queue) tabs.push('playlist');
+	const [tab, setTab] = useState<NavTab>(tabs.indexOf(startTab) !== -1 ? startTab : tabs[0]);
 	const [focusRow, setFocusRow] = useState(Math.max(0, current));
 	const [bmRow, setBmRow] = useState(0);
 
-	// Right from a chapter shows Bookmarks; Left from a bookmark shows Chapters (no walking up to the tabs).
-	const switchTo = (next: 'chapters' | 'bookmarks') => (ev: ReactKeyboardEvent<HTMLElement>) => {
-		const key = next === 'bookmarks' ? Keys.RIGHT : Keys.LEFT;
-		if (ev.keyCode !== key || (next === 'chapters' && !chapters.length)) return;
+	// Left and Right from the list move between tabs (no walking up to them).
+	const switchTo = (dir: 1 | -1) => (ev: ReactKeyboardEvent<HTMLElement>) => {
+		if (ev.keyCode !== (dir === 1 ? Keys.RIGHT : Keys.LEFT)) return;
+		const next = tabs[tabs.indexOf(tab) + dir];
+		if (!next) return;
 		ev.preventDefault();
 		ev.stopPropagation();
 		setTab(next);
+	};
+	const sideways = (ev: ReactKeyboardEvent<HTMLElement>) => {
+		switchTo(1)(ev);
+		switchTo(-1)(ev);
 	};
 
 	// After a bookmark is removed (its row had focus), move to the next one, or to "Add".
@@ -172,7 +188,8 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 			firstTab.current = false;
 			return undefined;
 		}
-		const t = window.setTimeout(() => focusWithin('nav-panel', tab === 'chapters' ? 'chapter:' + Math.max(0, current) : 'bookmark-add'), 0);
+		const target = tab === 'chapters' ? 'chapter:' + Math.max(0, current) : tab === 'bookmarks' ? 'bookmark-add' : 'queue:' + (queue ? queue.at : 0);
+		const t = window.setTimeout(() => focusWithin('nav-panel', target), 0);
 		return () => window.clearTimeout(t);
 	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 	return (
@@ -186,11 +203,19 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 								{'Chapters · ' + chapters.length}
 							</Button>
 						)}
-						<Button variant="chip" role="tab" aria-selected={tab === 'bookmarks'} className={'vf-tab' + (tab === 'bookmarks' ? ' is-selected' : '')} onClick={() => setTab('bookmarks')} onFocus={() => setTab('bookmarks')}>
-							{'Bookmarks · ' + bookmarks.length}
-						</Button>
+						{!episode && (
+							<Button variant="chip" role="tab" aria-selected={tab === 'bookmarks'} className={'vf-tab' + (tab === 'bookmarks' ? ' is-selected' : '')} onClick={() => setTab('bookmarks')} onFocus={() => setTab('bookmarks')}>
+								{'Bookmarks · ' + bookmarks.length}
+							</Button>
+						)}
+						{queue && (
+							<Button variant="chip" role="tab" aria-selected={tab === 'playlist'} className={'vf-tab' + (tab === 'playlist' ? ' is-selected' : '')} onClick={() => setTab('playlist')} onFocus={() => setTab('playlist')}>
+								{'Playlist · ' + (queue.at + 1) + '/' + queue.entries.length}
+							</Button>
+						)}
 					</div>
-					<span className="vf-muted">Back to close</span>
+					{/* Three tabs fill the head; Back still closes. */}
+					{tabs.length < 3 && <span className="vf-muted">Back to close</span>}
 				</div>
 				{tab === 'chapters' ? (
 					<div className="vf-chapters" onScroll={pinScroll}>
@@ -202,7 +227,10 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 										data-default-focus={(startTab === 'chapters' && i === Math.max(0, current)) || undefined}
 										data-focus-key={'chapter:' + i}
 										onFocus={() => setFocusRow(i)}
-										onKeyDown={switchTo('bookmarks')}
+										onKeyDown={(ev) => {
+											sideways(ev);
+											pageBy(ev, 'chapter:', i, chapters.length);
+										}}
 										onClick={() => onPick(c.start)}
 									>
 										<span className="vf-chapter__num">{i + 1}</span>
@@ -213,21 +241,23 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 							))}
 						</ol>
 					</div>
+				) : tab === 'playlist' && queue ? (
+					<QueueList queue={queue} onPick={onQueuePick} onKeyDown={sideways} />
 				) : (
 					<div className="vf-chapters" onScroll={pinScroll}>
 						<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, bmRow - 4) * CHAPTER_PITCH + 'px)'}}>
 							<li>
-								<Button className="vf-bookmark-add" data-default-focus={startTab === 'bookmarks' || undefined} data-focus-key="bookmark-add" onFocus={() => setBmRow(0)} onKeyDown={switchTo('chapters')} onClick={onAddBookmark}>
+								<Button className="vf-bookmark-add" data-default-focus={startTab === 'bookmarks' || undefined} data-focus-key="bookmark-add" onFocus={() => setBmRow(0)} onKeyDown={sideways} onClick={onAddBookmark}>
 									<Icon name="bookmark" size={26} />{'Add a bookmark at ' + formatClock(position)}
 								</Button>
 							</li>
 							{bookmarks.map((b, i) => (
 								<li key={b.time + ':' + b.createdAt} className="vf-bookmark">
-									<Tile className="vf-chapter vf-bookmark__row" data-focus-key={'bookmark:' + i} onFocus={() => setBmRow(i + 1)} onKeyDown={switchTo('chapters')} onClick={() => onPick(b.time)} aria-label={b.title + ' at ' + formatClock(b.time)}>
+									<Tile className="vf-chapter vf-bookmark__row" data-focus-key={'bookmark:' + i} onFocus={() => setBmRow(i + 1)} onKeyDown={switchTo(-1)} onClick={() => onPick(b.time)} aria-label={b.title + ' at ' + formatClock(b.time)}>
 										<span className="vf-chapter__title">{b.title.replace(/ · [\d:]+$/, '')}</span>
 										<span className="vf-chapter__meta">{formatClock(b.time)}</span>
 									</Tile>
-									<Button variant="icon" className="vf-bookmark__remove" aria-label={'Remove bookmark ' + b.title} onFocus={() => setBmRow(i + 1)} onClick={() => {
+									<Button variant="icon" className="vf-bookmark__remove" aria-label={'Remove bookmark ' + b.title} onFocus={() => setBmRow(i + 1)} onKeyDown={switchTo(1)} onClick={() => {
 										lastRemovedAt.current = i;
 										onRemoveBookmark(b);
 									}}
@@ -240,6 +270,7 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 						</ol>
 					</div>
 				)}
+				{tabs.length >= 3 && <p className="vf-panel__foot">Back to close · ◀ ▶ switch tabs</p>}
 			</PanelScope>
 		</>
 	);
@@ -256,6 +287,51 @@ export interface QueueView {
 	done: string[];
 }
 
+/** Channel up/down in a long panel list: jump eight rows. */
+function pageBy (ev: ReactKeyboardEvent<HTMLElement>, prefix: string, at: number, count: number): void {
+	if (ev.keyCode !== Keys.CH_UP && ev.keyCode !== Keys.CH_DOWN) return;
+	ev.preventDefault();
+	ev.stopPropagation();
+	const next = Math.max(0, Math.min(count - 1, at + (ev.keyCode === Keys.CH_DOWN ? 8 : -8)));
+	const panel = (ev.currentTarget as HTMLElement).closest('[data-spotlight-id]');
+	focusWithin(panel ? (panel.getAttribute('data-spotlight-id') as string) : 'nav-panel', prefix + next);
+}
+
+/** The playlist's entries: Playing, Up next, Finished. OK plays one. */
+function QueueList ({queue, onPick, onKeyDown}: {queue: QueueView; onPick: (key: string) => void; onKeyDown?: (ev: ReactKeyboardEvent<HTMLElement>) => void}) {
+	const [row, setRow] = useState(queue.at);
+	return (
+		<div className="vf-chapters" onScroll={pinScroll}>
+			<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, row - 3) * CHAPTER_PITCH + 'px)'}}>
+				{queue.entries.map((e, i) => {
+					const finished = queue.done.indexOf(e.key) !== -1;
+					const state = i === queue.at ? 'Playing' : e.key === queue.nextKey && !queue.stopAfter ? 'Up next' : finished ? 'Finished' : e.episodeId ? e.date : '';
+					return (
+						<li key={e.key}>
+							<Tile
+								className={'vf-chapter' + (i === queue.at ? ' is-current' : '') + (finished && i !== queue.at ? ' is-played' : '')}
+								data-focus-key={'queue:' + i}
+								data-default-focus={i === queue.at || undefined}
+								aria-label={(i + 1) + '. ' + e.title + (state ? ', ' + state : '')}
+								onFocus={() => setRow(i)}
+								onKeyDown={(ev) => {
+									if (onKeyDown) onKeyDown(ev);
+									pageBy(ev, 'queue:', i, queue.entries.length);
+								}}
+								onClick={() => onPick(e.key)}
+							>
+								<span className="vf-chapter__num">{i + 1}</span>
+								<span className="vf-chapter__title">{e.title}</span>
+								<span className="vf-chapter__meta">{state}</span>
+							</Tile>
+						</li>
+					);
+				})}
+			</ol>
+		</div>
+	);
+}
+
 interface QueuePanelProps {
 	queue: QueueView;
 	onPick: (key: string) => void;
@@ -265,7 +341,6 @@ interface QueuePanelProps {
 
 /** The playlist being played: where you are in it, jump to any entry, stop after this one, or leave. */
 function QueuePanel ({queue, onPick, onStopAfter, onLeave}: QueuePanelProps) {
-	const [row, setRow] = useState(queue.at);
 	// Leaving takes a second press, so a stray OK doesn't lose the place.
 	const [confirmLeave, setConfirmLeave] = useState(false);
 	return (
@@ -277,30 +352,7 @@ function QueuePanel ({queue, onPick, onStopAfter, onLeave}: QueuePanelProps) {
 					<span className="vf-muted">Back to close</span>
 				</div>
 				<p className="vf-panel__status">{'Playlist · ' + (queue.at + 1) + ' of ' + queue.entries.length + (queue.stopAfter ? ' · stopping after this one' : '') + (queue.done.length ? ' · ' + queue.done.length + ' finished' : '')}</p>
-				<div className="vf-chapters" onScroll={pinScroll}>
-					<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, row - 3) * CHAPTER_PITCH + 'px)'}}>
-						{queue.entries.map((e, i) => {
-							const finished = queue.done.indexOf(e.key) !== -1;
-							const state = i === queue.at ? 'Playing' : e.key === queue.nextKey && !queue.stopAfter ? 'Up next' : finished ? 'Finished' : e.episodeId ? e.date : '';
-							return (
-								<li key={e.key}>
-									<Tile
-										className={'vf-chapter' + (i === queue.at ? ' is-current' : '') + (finished && i !== queue.at ? ' is-played' : '')}
-										data-focus-key={'queue:' + i}
-										data-default-focus={i === queue.at || undefined}
-										aria-label={(i + 1) + '. ' + e.title + (state ? ', ' + state : '')}
-										onFocus={() => setRow(i)}
-										onClick={() => onPick(e.key)}
-									>
-										<span className="vf-chapter__num">{i + 1}</span>
-										<span className="vf-chapter__title">{e.title}</span>
-										<span className="vf-chapter__meta">{state}</span>
-									</Tile>
-								</li>
-							);
-						})}
-					</ol>
-				</div>
+				<QueueList queue={queue} onPick={onPick} />
 				<div className="vf-row vf-row--spaced vf-queue__actions">
 					<Button className={queue.stopAfter ? 'is-selected' : ''} role="switch" aria-checked={queue.stopAfter} data-focus-key="stop-after" onClick={onStopAfter}>
 						{queue.stopAfter && <Icon name="check" size={24} />}{queue.stopAfter ? 'Stopping after this one' : 'Stop after this one'}
@@ -411,7 +463,7 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 			else if (isBackKey(code) && showUpNext) onDeclineNext();
 			else if (isBackKey(code) && preview !== null) setPreview(null);
 			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
-			else if (code === Keys.RED && (!player.episodeId || player.chapters.length > 0)) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
+			else if (code === Keys.RED && (!player.episodeId || player.chapters.length > 0 || queue)) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
 			else if (code === Keys.BLUE && !player.episodeId) onAddBookmark();
 			else if (code === Keys.YELLOW) setPanel((o) => (o === 'sleep' ? 'none' : 'sleep'));
 			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
@@ -424,7 +476,7 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [engine, panel, preview, showUpNext, player.chapters.length, player.episodeId, onDeclineNext, onAddBookmark]);
+	}, [engine, panel, preview, showUpNext, player.chapters.length, player.episodeId, onDeclineNext, onAddBookmark, queue]);
 
 	// When a panel closes, put focus back on the button that opened it.
 	const wasOpen = useRef<Panel>('none');
@@ -641,9 +693,9 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 								<Icon name="bookmark" size={28} /><span className="vf-dot vf-dot--blue vf-round__dot" />
 							</Button>
 						)}
-						{(!p.episodeId || p.chapters.length > 0) && (
+						{(!p.episodeId || p.chapters.length > 0 || queue) && (
 							<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel(p.chapters.length ? 'chapters' : 'bookmarks')}>
-								<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : 'Bookmarks'}
+								<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : p.episodeId ? 'Playlist' : 'Bookmarks'}
 							</Button>
 						)}
 					</div>
@@ -696,6 +748,13 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 					}}
 					onAddBookmark={onAddBookmark}
 					onRemoveBookmark={onRemoveBookmark}
+					episode={Boolean(p.episodeId)}
+					queue={queue}
+					onQueuePick={(key) => {
+						setPanel('none');
+						if (queue && queue.entries[queue.at] && queue.entries[queue.at].key === key) return;
+						onQueuePick(key);
+					}}
 				/>
 			)}
 			{showUpNext && next && (
