@@ -513,7 +513,7 @@ function App () {
 	const toggleAutoplay = useCallback(() => {
 		const on = !getSettings().seriesAutoplay;
 		updateSettings({seriesAutoplay: on});
-		pushToast(on ? 'Series autoplay on' : 'Series autoplay off');
+		pushToast(on ? 'Autoplay on' : 'Autoplay off');
 	}, [pushToast]);
 
 	// Save the position when the TV hides the app (Home button, input switch, power off).
@@ -661,6 +661,7 @@ function App () {
 					onShowPlayer={(fromKey) => showPlayer(fromKey)}
 					onTab={onTab}
 					onSettings={onSettings}
+					onToast={pushToast}
 				/>
 			)}
 			{route.name === 'library' && client && (
@@ -706,6 +707,7 @@ function App () {
 					player={player}
 					restoreKey={top.focusKey}
 					onPlayEpisode={openEpisode}
+					onToast={pushToast}
 				/>
 			)}
 			{route.name === 'authors' && client && (

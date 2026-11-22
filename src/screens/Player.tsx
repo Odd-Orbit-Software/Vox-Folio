@@ -408,6 +408,8 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 	}
 
 	const loading = p.status === 'loading' && !p.title;
+	/** Something can follow this item: a series book or a podcast episode. */
+	const hasNext = Boolean(p.series || p.episodeId);
 
 	return (
 		<ScreenContainer key="player" id="player" className={'vf-player' + (panel !== 'none' ? ' has-panel' : '')}>
@@ -415,11 +417,6 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 				<span className="vf-hint"><Icon name="chevronDown" size={24} />Back to browsing</span>
 				<Clock className="vf-player__time" />
 				<span className="vf-player__status">
-					{(p.series || p.episodeId) && (
-						<span className={'vf-hint vf-player__autoplay' + (autoplay ? ' is-on' : '')}>
-							<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
-						</span>
-					)}
 					<span className="vf-hint">
 						{p.sync === 'synced' ? <Icon name="cloud" size={24} /> : <Icon name="cloudOff" size={24} />}
 						{syncLabel(p, now)}
@@ -480,6 +477,19 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						<Button variant="chip" className={p.sleep ? 'is-active' : ''} data-focus-key="sleep" onClick={() => setPanel('sleep')}>
 							<span className="vf-dot vf-dot--yellow" />{sleepChipLabel(p.sleep)}
 						</Button>
+						{hasNext && (
+							<Button
+								variant="chip"
+								className={'vf-autoplay' + (autoplay ? ' is-active' : '')}
+								role="switch"
+								aria-checked={autoplay}
+								aria-label={'Autoplay the next ' + (p.episodeId ? 'episode' : 'book') + ': ' + (autoplay ? 'on' : 'off')}
+								data-focus-key="autoplay"
+								onClick={onToggleAutoplay}
+							>
+								<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
+							</Button>
+						)}
 					</div>
 					<div className="vf-transport__main">
 						<Button variant="icon" className="vf-round" aria-label="Previous chapter" disabled={!p.chapters.length} onClick={() => engine.previousChapter()}><Icon name="prevChapter" size={34} /></Button>
@@ -525,7 +535,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						engine.setSleep(c);
 						setPanel('none');
 					}}
-					autoplay={p.series || p.episodeId ? autoplay : null}
+					autoplay={hasNext ? autoplay : null}
 					episode={Boolean(p.episodeId)}
 					onToggleAutoplay={onToggleAutoplay}
 				/>

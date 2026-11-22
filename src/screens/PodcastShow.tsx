@@ -1,12 +1,13 @@
 import {useEffect, useState} from 'react';
 
-import {AbsClient, AbsError} from '../abs/client';
+import {AbsClient, AbsError, progressKey} from '../abs/client';
 import type {LibraryItem, MediaProgress, PodcastEpisode} from '../abs/types';
 import {episodeLength, episodeState, episodeTitle, plainText} from '../app/podcasts';
-import {Cover, Icon, Tile} from '../components/controls';
+import {Button, Cover, Icon, Tile} from '../components/controls';
 import {ErrorPanel} from '../components/ErrorPanel';
 import {Marquee} from '../components/marquee';
 import {pinScroll, ScreenContainer} from '../components/ScreenContainer';
+import {Keys} from '../platform/webos';
 import type {PlayerState} from '../player/engine';
 
 interface PodcastShowProps {
@@ -16,6 +17,7 @@ interface PodcastShowProps {
 	player: PlayerState;
 	restoreKey: string | null;
 	onPlayEpisode: (itemId: string, episodeId: string, fromKey: string) => void;
+	onToast: (text: string) => void;
 }
 
 type Load = {state: 'loading'} | {state: 'error'; error: AbsError} | {state: 'ready'; show: LibraryItem; episodes: PodcastEpisode[]; progress: Record<string, MediaProgress>};
@@ -37,7 +39,7 @@ function dateParts (at: number | null | undefined): [string, string] {
 }
 
 /** One show: its description and every episode, newest first. OK plays an episode. */
-export default function PodcastShow ({client, itemId, title, player, restoreKey, onPlayEpisode}: PodcastShowProps) {
+export default function PodcastShow ({client, itemId, title, player, restoreKey, onPlayEpisode, onToast}: PodcastShowProps) {
 	const [load, setLoad] = useState<Load>({state: 'loading'});
 	const [reload, setReload] = useState(0);
 	const [focusRow, setFocusRow] = useState(0);
@@ -56,6 +58,26 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 		};
 	}, [client, itemId, reload]);
 
+	const [busy, setBusy] = useState<string | null>(null);
+	/** Mark an episode played, or not, and show the server's answer. */
+	const togglePlayed = (e: PodcastEpisode, played: boolean) => {
+		if (busy) return;
+		setBusy(e.id);
+		client.setFinished(itemId, !played, e.id).then(() => client.getProgress(itemId, e.id)).then((p) => {
+			setBusy(null);
+			setLoad((l) => {
+				if (l.state !== 'ready') return l;
+				const progress = {...l.progress};
+				if (p) progress[progressKey(itemId, e.id)] = p;
+				else delete progress[progressKey(itemId, e.id)];
+				return {...l, progress};
+			});
+		}, () => {
+			setBusy(null);
+			onToast(played ? "Couldn't mark that unplayed" : "Couldn't mark that played");
+		});
+	};
+
 	const ready = load.state === 'ready' ? load : null;
 	const md = ready ? ready.show.media.metadata : null;
 	const episodes = ready ? ready.episodes : [];
@@ -63,10 +85,16 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 	const focused = episodes[focusRow];
 	const episodeAbout = focused ? plainText(focused.description) : '';
 	const description = episodeAbout || (md ? plainText(md.description) : '');
+	const focusedPlayed = Boolean(ready && focused && episodeState(focused, ready.progress).finished);
 
 	return (
 		<ScreenContainer id="podcast-show" className="vf-series vf-show" restoreKey={restoreKey} focusDeps={[load.state]}>
 			<div className="vf-hint vf-series__back"><Icon name="back" size={24} />Back</div>
+			{focused && (
+				<div className="vf-hint vf-show__hint" aria-hidden="true">
+					<span className="vf-dot vf-dot--red" />{focusedPlayed ? 'Mark unplayed' : 'Mark played'}
+				</div>
+			)}
 			<header className="vf-series__head vf-show__head">
 				<Cover url={client.coverUrl(itemId, 360)} title={title} size={180} className="vf-show__cover" />
 				<div className="vf-show__intro">
@@ -94,13 +122,18 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 						const [day, monthYear] = dateParts(e.publishedAt);
 						const key = 'ep:' + itemId + '/' + e.id;
 						return (
-							<li key={e.id}>
+							<li key={e.id} className="vf-show__item">
 								<Tile
 									className="vf-series__row vf-show__row"
 									data-focus-key={key}
 									data-default-focus={i === 0 || undefined}
 									aria-label={episodeTitle(e) + (monthYear ? ', ' + day + ' ' + monthYear : '')}
 									onFocus={() => setFocusRow(i)}
+									onKeyDown={(ev) => {
+										if (ev.keyCode !== Keys.RED) return;
+										ev.preventDefault();
+										togglePlayed(e, s.finished);
+									}}
 									onClick={() => onPlayEpisode(itemId, e.id, key)}
 								>
 									<span className="vf-series__seq vf-show__date">{day}<span className="vf-show__month">{monthYear}</span></span>
@@ -114,6 +147,24 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 										{!s.finished && !playing && pct === 0 && <span className="vf-faint">New</span>}
 									</span>
 								</Tile>
+								<Button
+									variant="icon"
+									className={'vf-show__played' + (s.finished ? ' is-on' : '')}
+									role="switch"
+									aria-checked={s.finished}
+									aria-label={s.finished ? 'Played. OK to mark unplayed' : 'Mark played'}
+									data-focus-key={'played:' + e.id}
+									aria-busy={busy === e.id}
+									onFocus={() => setFocusRow(i)}
+									onKeyDown={(ev) => {
+										if (ev.keyCode !== Keys.RED) return;
+										ev.preventDefault();
+										togglePlayed(e, s.finished);
+									}}
+									onClick={() => togglePlayed(e, s.finished)}
+								>
+									<Icon name="check" size={30} />
+								</Button>
 							</li>
 						);
 					})}

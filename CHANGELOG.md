@@ -3,6 +3,13 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.3.1
+
+- The player has an Autoplay switch beside Sleep, for books in a series and for podcast episodes.
+- Take something off Continue listening without finishing it: Remove on Home's main card, or Red on a tile in In progress. Red again within a few seconds undoes it. Listening again brings it back.
+- Mark a podcast episode played or unplayed from its show: Red on the episode, or the check beside it.
+- The Autoplay setting now covers podcast episodes too.
+
 ## 0.3.0
 
 **Podcasts ★**

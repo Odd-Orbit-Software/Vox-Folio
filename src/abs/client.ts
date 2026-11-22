@@ -384,6 +384,11 @@ export class AbsClient {
 		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId) + episodePath(episodeId), {isFinished});
 	}
 
+	/** Take something off Continue Listening without finishing it. Listening again brings it back. */
+	removeFromContinueListening (progressId: string): Promise<void> {
+		return this.request<void>('GET', '/api/me/progress/' + encodeURIComponent(progressId) + '/remove-from-continue-listening');
+	}
+
 	startPlayback (itemId: string, device: DeviceInfo, supportedMimeTypes: string[], episodeId?: string | null): Promise<PlaybackSession> {
 		return this.request<PlaybackSession>('POST', '/api/items/' + encodeURIComponent(itemId) + '/play' + episodePath(episodeId), {
 			deviceInfo: device,

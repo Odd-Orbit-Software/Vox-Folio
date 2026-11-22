@@ -114,6 +114,8 @@ export interface PodcastEpisode {
 }
 
 export interface MediaProgress {
+	/** The progress record's own ID (used to hide it from Continue Listening). */
+	id?: string;
 	libraryItemId: string;
 	/** Set for a podcast episode's progress. */
 	episodeId?: string | null;
@@ -123,6 +125,8 @@ export interface MediaProgress {
 	isFinished: boolean;
 	lastUpdate: number;
 	finishedAt?: number | null;
+	/** Removed from Continue Listening; cleared by the server when listening moves on. */
+	hideFromContinueListening?: boolean;
 }
 
 export interface PlaybackSession {
@@ -210,3 +214,4 @@ export interface ListeningStats {
 	days: Record<string, number>;
 	today: number;
 }
+

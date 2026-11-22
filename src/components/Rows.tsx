@@ -21,10 +21,12 @@ interface CoverRowProps {
 	/** Extra text after the title, e.g. a count. */
 	meta?: string;
 	defaultFocus?: boolean;
+	/** A Red-button action on the focused tile, hinted beside the title while the row has focus. */
+	action?: {label: string; onAction: (item: GridItem) => void};
 }
 
 /** A titled horizontal shelf of covers that slides to keep the focused one in view. */
-export function CoverRow ({title, items, onSelect, meta, defaultFocus}: CoverRowProps) {
+export function CoverRow ({title, items, onSelect, meta, defaultFocus, action}: CoverRowProps) {
 	const [index, setIndex] = useState(0);
 	const maxOffset = Math.max(0, items.length - VISIBLE) * ITEM_PITCH;
 	const offset = Math.min(maxOffset, Math.max(0, index - (VISIBLE - 2)) * ITEM_PITCH);
@@ -34,6 +36,7 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus}: CoverRow
 			<h2 className="vf-crow__title">
 				{title}
 				{meta && <span className="vf-crow__meta">{meta}</span>}
+				{action && <span className="vf-crow__action" aria-hidden="true"><span className="vf-dot vf-dot--red" />{action.label}</span>}
 			</h2>
 			<div className="vf-crow__viewport" onScroll={pinScroll}>
 				<div className="vf-crow__track" style={{transform: 'translateX(' + -offset + 'px)'}}>
@@ -47,6 +50,12 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus}: CoverRow
 							onFocus={() => setIndex(i)}
 							onClick={() => onSelect(item)}
 							onKeyDown={(ev: KeyboardEvent<HTMLDivElement>) => {
+								if (action && ev.keyCode === Keys.RED) {
+									ev.preventDefault();
+									ev.stopPropagation();
+									action.onAction(item);
+									return;
+								}
 								// Right at the end of a shelf stays put rather than diving into the row below.
 								if (ev.keyCode === Keys.RIGHT && i === items.length - 1) {
 									ev.preventDefault();

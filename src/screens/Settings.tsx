@@ -58,7 +58,7 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 					<Row id="skipForward" label="Skip forward" hint="How far fast-forward jumps ahead" value={s.skipForward + ' seconds'} onSelect={() => updateSettings({skipForward: nextChoice(SKIP_CHOICES, s.skipForward)})} />
 					<Row id="smartRewind" label="Smart rewind" hint="Replay a few seconds when you resume" value={onOff(s.smartRewind)} onSelect={() => updateSettings({smartRewind: !s.smartRewind})} />
 					<Row id="sleepDefault" label="Sleep timer" hint="Default timer for the yellow remote button" value={sleepLabel(s.sleepDefault)} onSelect={() => updateSettings({sleepDefault: nextChoice(SLEEP_CHOICES, s.sleepDefault)})} />
-					<Row id="autoplay" label="Series autoplay" hint="Play the next book in a series when one ends" value={onOff(s.seriesAutoplay)} onSelect={() => updateSettings({seriesAutoplay: !s.seriesAutoplay})} />
+					<Row id="autoplay" label="Autoplay" hint="Play the next book in a series, or the next episode, when one ends" value={onOff(s.seriesAutoplay)} onSelect={() => updateSettings({seriesAutoplay: !s.seriesAutoplay})} />
 					<Row id="nightMode" label="Screensaver night mode ★" hint="Dimmer and slower from 10pm to 6am" value={premium ? onOff(s.nightMode) : '★ Premium'} onSelect={() => premium && updateSettings({nightMode: !s.nightMode})} />
 					<Row id="stats" label="Listening stats ★" hint="Time listened, streaks, and books finished" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onStats()} />
 				</section>

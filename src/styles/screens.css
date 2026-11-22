@@ -1779,10 +1779,6 @@
 	margin-left: 28px;
 }
 
-.vf-player__autoplay.is-on {
-	color: #CFC8BD;
-}
-
 .vf-transport__side--end > * + * {
 	margin-left: 16px;
 }
@@ -2037,6 +2033,20 @@
 	display: flex;
 }
 
+.vf-transport__side--start > * + * {
+	margin-left: 16px;
+}
+
+.vf-autoplay > svg {
+	margin-right: 10px;
+}
+
+/* On is a quiet paper tint: yellow belongs to Sleep (the Yellow button). */
+.vf-btn--chip.vf-autoplay.is-active:not(:focus) {
+	background: rgba(243, 238, 230, 0.14);
+	color: var(--vf-paper);
+}
+
 .vf-btn--chip.is-active {
 	background: rgba(232, 197, 71, 0.16);
 	color: #F3E2A6;
@@ -2143,6 +2153,22 @@
 	margin: 0 0 18px;
 	font-size: 32px;
 	font-weight: 600;
+}
+
+/* The row's Red-button action: hinted only while the row has focus. */
+.vf-crow__action {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 28px;
+	font-size: 22px;
+	font-weight: 500;
+	color: var(--vf-muted);
+	opacity: 0;
+	transition: opacity 160ms ease-out;
+}
+
+.vf-crow:focus-within .vf-crow__action {
+	opacity: 1;
 }
 
 .vf-crow__meta {
@@ -2819,6 +2845,47 @@
 .vf-show__date {
 	display: flex;
 	flex-direction: column;
+	align-items: center;
+}
+
+.vf-show__item {
+	display: flex;
+	align-items: center;
+	/* Room for the focused toggle's ring inside the clipped viewport. */
+	padding-right: 24px;
+}
+
+.vf-show__item > .vf-show__row {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Played toggle beside each episode: an outline when unplayed, filled when played. */
+.vf-show__played {
+	flex: none;
+	margin-left: 16px;
+	width: 72px;
+	height: 72px;
+	border-radius: 36px;
+	box-shadow: inset 0 0 0 2px rgba(243, 238, 230, 0.18);
+}
+
+/* Unplayed is an empty ring (the check appears only on focus); played is a green check, matching the row's "Played". */
+.vf-show__played:not(.is-on):not(:focus) > svg {
+	opacity: 0;
+}
+
+.vf-show__played.is-on:not(:focus) {
+	background: rgba(127, 196, 160, 0.16);
+	color: var(--vf-sage);
+	box-shadow: none;
+}
+
+.vf-show__hint {
+	position: absolute;
+	top: 54px;
+	right: 96px;
+	display: flex;
 	align-items: center;
 }
 
