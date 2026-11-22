@@ -4,7 +4,9 @@ import {useEffect, useRef} from 'react';
 import type {Route} from '../app/routes';
 import mark from '../assets/vox-folio-mark.svg';
 import {Keys} from '../platform/webos';
+import {initials} from '../app/profiles';
 import {Button, Icon} from './controls';
+import {useProfileInfo} from './ProfileContext';
 import type {IconName} from './controls';
 
 const TABS: {name: Route['name']; label: string; icon: IconName}[] = [
@@ -33,6 +35,7 @@ function isLeftmostInRow (el: Element, scope: Element): boolean {
     item in any row comes here (Spotlight alone would pick the nearest thing down-left instead). */
 export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab: (name: Route['name']) => void; onSettings: () => void}) {
 	const nav = useRef<HTMLElement>(null);
+	const profile = useProfileInfo();
 
 	useEffect(() => {
 		const onKeyDown = (ev: KeyboardEvent) => {
@@ -54,6 +57,11 @@ export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab
 	return (
 		<nav className="vf-rail" aria-label="Main" ref={nav}>
 			<img className="vf-rail__mark" src={mark} alt="" aria-hidden="true" />
+			{profile && (
+				<Button variant="icon" className="vf-rail__btn vf-rail__avatar" aria-label={'Listening as ' + profile.name + '. OK to switch'} data-focus-key="rail:profile" onClick={profile.onOpen}>
+					<span>{initials(profile.name)}</span>
+				</Button>
+			)}
 			<div className="vf-rail__tabs">
 				{TABS.map((t) => (
 					<Button

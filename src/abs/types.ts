@@ -162,3 +162,11 @@ export interface Playlist {
 	name: string;
 	items?: {libraryItemId: string; libraryItem?: LibraryItem}[];
 }
+
+export interface Bookmark {
+	libraryItemId: string;
+	/** Book time in seconds. */
+	time: number;
+	title: string;
+	createdAt: number;
+}

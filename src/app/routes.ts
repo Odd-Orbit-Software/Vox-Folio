@@ -1,7 +1,8 @@
 /* The app's screens as a stack, so Back returns to the previous screen with focus on what you left. */
 
 export type Route =
-	| {name: 'setup'}
+	| {name: 'setup'; adding?: boolean}
+	| {name: 'profiles'}
 	| {name: 'home'}
 	| {name: 'library'}
 	| {name: 'series'}

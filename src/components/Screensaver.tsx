@@ -7,7 +7,7 @@ import {Cover} from './controls';
 /** The listening screensaver (design canvas board 10): the time and the current book drift slowly around
     a near-black screen, the percentage updating as the narration continues. Without a book, the time
     and the wordmark drift. */
-export function Screensaver ({player}: {player: PlayerState}) {
+export function Screensaver ({player, listener = ''}: {player: PlayerState; listener?: string}) {
 	const book = player.itemId && player.status !== 'error' && player.title ? player : null;
 	const percent = book && book.duration ? Math.floor((book.position / book.duration) * 100) : 0;
 	const chapter = book && book.chapterIndex >= 0 ? book.chapters[book.chapterIndex] : null;
@@ -22,6 +22,7 @@ export function Screensaver ({player}: {player: PlayerState}) {
 							<div className="vf-saver__text">
 								<Clock className="vf-saver__clock" />
 								<div className="vf-saver__title">{book.title}</div>
+								{listener && <div className="vf-saver__listener">{listener + "'s book"}</div>}
 								<div className="vf-saver__chapter">
 									{chapter ? chapter.title : book.author}
 									{book.status === 'paused' ? ' · Paused' : ''}

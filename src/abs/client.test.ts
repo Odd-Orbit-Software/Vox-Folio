@@ -78,4 +78,27 @@ describe('AbsClient', () => {
 		expect(err).toBeInstanceOf(AbsError);
 		expect((err as AbsError).kind).toBe('network');
 	});
+
+	it('lists only the bookmarks in this book, in book order', async () => {
+		global.fetch = jest.fn(() => reply(200, JSON.stringify({bookmarks: [
+			{libraryItemId: 'a', time: 500, title: 'later', createdAt: 2},
+			{libraryItemId: 'b', time: 10, title: 'other book', createdAt: 1},
+			{libraryItemId: 'a', time: 20, title: 'earlier', createdAt: 3}
+		]}))) as unknown as typeof fetch;
+		const client = new AbsClient(creds, () => undefined);
+		const list = await client.bookmarks('a');
+		expect(list.map((b) => b.title)).toEqual(['earlier', 'later']);
+	});
+
+	it('adds and removes bookmarks at the right addresses', async () => {
+		const calls: string[] = [];
+		global.fetch = jest.fn((url: string, init: RequestInit) => {
+			calls.push(init.method + ' ' + url.replace('https://abs.test', '') + (init.body ? ' ' + init.body : ''));
+			return reply(200, '{"libraryItemId":"a","time":42,"title":"t","createdAt":1}');
+		}) as unknown as typeof fetch;
+		const client = new AbsClient(creds, () => undefined);
+		await client.addBookmark('a', 42, 't');
+		await client.removeBookmark('a', 42);
+		expect(calls).toEqual(['POST /api/me/item/a/bookmark {"time":42,"title":"t"}', 'DELETE /api/me/item/a/bookmark/42']);
+	});
 });

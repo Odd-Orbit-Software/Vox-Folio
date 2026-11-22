@@ -94,7 +94,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	const nowPlaying = player.itemId && player.status !== 'error' ? player : null;
 
 	return (
-		<ScreenContainer id="home" className="vf-home vf-browse" restoreKey={restoreKey} focusDeps={[load.state]}>
+		<ScreenContainer id="home" className="vf-home vf-browse" restoreKey={restoreKey} focusDeps={[load.state, extraRows.length > 0]}>
 			<Rail active="home" onTab={onTab} onSettings={onSettings} />
 			<header className="vf-topbar">
 				<h1 className="vf-browse__h1">Home</h1>
@@ -130,19 +130,18 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				</div>
 			)}
 
-			{load.state === 'ready' && !hero && (
-				<div className="vf-message">
-					<h1 className="vf-message__title">Nothing in progress yet</h1>
-					<p className="vf-message__body">Start a book on your phone, or open one from the Polaris home screen, and it will show up here.</p>
-					{nowPlaying && (
-						<div className="vf-row">
-							<Button variant="primary" data-default-focus onClick={() => onShowPlayer('now-playing')}>Back to the player</Button>
-						</div>
-					)}
-				</div>
-			)}
-
 			<VScroll className="vf-home__rows">
+				{load.state === 'ready' && !hero && (
+					<div className="vf-message vf-home__empty" data-vrow>
+						<h1 className="vf-message__title">Nothing in progress yet</h1>
+						<p className="vf-message__body">Start a book on your phone, or open one from the Polaris home screen, and it will show up here.</p>
+						{nowPlaying && (
+							<div className="vf-row">
+								<Button variant="primary" data-default-focus onClick={() => onShowPlayer('now-playing')}>Back to the player</Button>
+							</div>
+						)}
+					</div>
+				)}
 				{hero && (
 					<section className="vf-hero" data-vrow aria-label="Continue listening">
 						<Cover url={client.coverUrl(hero.item.id, 680)} title={hero.item.media.metadata.title} author={hero.item.media.metadata.authorName} size={340} className="vf-hero__cover" />
@@ -177,8 +176,8 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				{rest.length > 0 && (
 					<CoverRow title="In progress" items={restItems} onSelect={(g) => onPlay(g.key.slice(5), g.key)} />
 				)}
-				{extraRows.map((r) => (
-					<CoverRow key={r.id} title={r.label} items={r.items} onSelect={(g) => onDetails(g.key.slice(r.prefix.length + 1), g.key)} />
+				{extraRows.map((r, i) => (
+					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && i === 0} onSelect={(g) => onDetails(g.key.slice(r.prefix.length + 1), g.key)} />
 				))}
 			</VScroll>
 		</ScreenContainer>

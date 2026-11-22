@@ -21,6 +21,12 @@ export const SKIP_CHOICES = [10, 15, 30, 45, 60];
 export const SLEEP_CHOICES: SleepDefault[] = ['off', 'chapter', 15, 30, 45, 60];
 
 const KEY = 'voxfolio.settings.v1';
+/** Settings belong to the active profile; before profiles existed they were stored under KEY alone. */
+let profileId: string | null = null;
+
+function keyFor (id: string | null): string {
+	return id ? KEY + ':' + id : KEY;
+}
 
 const defaults: Settings = {
 	skipBack: 30,
@@ -33,7 +39,8 @@ const defaults: Settings = {
 function load (): Settings {
 	let stored: Partial<Settings> = {};
 	try {
-		const raw = window.localStorage.getItem(KEY);
+		// A profile without its own settings yet starts from the ones saved on this TV before.
+		const raw = window.localStorage.getItem(keyFor(profileId)) || window.localStorage.getItem(KEY);
 		if (raw) stored = JSON.parse(raw) as Partial<Settings>;
 	} catch {
 		stored = {};
@@ -58,13 +65,21 @@ export function getSettings (): Settings {
 export function updateSettings (patch: Partial<Settings>): Settings {
 	current = {...getSettings(), ...patch};
 	try {
-		window.localStorage.setItem(KEY, JSON.stringify(current));
+		window.localStorage.setItem(keyFor(profileId), JSON.stringify(current));
 	} catch {
 		// Storage unavailable: the change still applies for this run.
 	}
 	if (patch.seriesAutoplay !== undefined) saveAutoplay(patch.seriesAutoplay);
 	listeners.forEach((fn) => fn());
 	return current;
+}
+
+/** Switch to another profile's settings (on sign-in or a profile switch). */
+export function selectProfileSettings (id: string | null): void {
+	if (id === profileId && current) return;
+	profileId = id;
+	current = typeof window !== 'undefined' ? load() : {...defaults};
+	listeners.forEach((fn) => fn());
 }
 
 export function subscribeSettings (fn: () => void): () => void {

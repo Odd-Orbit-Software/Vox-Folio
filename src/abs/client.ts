@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Author, AuthorDetail, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
+import type {Author, AuthorDetail, Bookmark, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -280,6 +280,20 @@ export class AbsClient {
 		const filter = 'narrators.' + window.btoa(unescape(encodeURIComponent(narrator)));
 		const page = await this.libraryItems(libraryId, {sort: 'media.metadata.title', page: 0, limit: 200, filter});
 		return page && page.results || [];
+	}
+
+	/** This listener's bookmarks in one book, in book order. */
+	async bookmarks (itemId: string): Promise<Bookmark[]> {
+		const me = await this.request<{bookmarks?: Bookmark[]}>('GET', '/api/me');
+		return (me && me.bookmarks || []).filter((b) => b.libraryItemId === itemId).sort((a, b) => a.time - b.time);
+	}
+
+	addBookmark (itemId: string, time: number, title: string): Promise<Bookmark> {
+		return this.request<Bookmark>('POST', '/api/me/item/' + encodeURIComponent(itemId) + '/bookmark', {time, title});
+	}
+
+	removeBookmark (itemId: string, time: number): Promise<void> {
+		return this.request<void>('DELETE', '/api/me/item/' + encodeURIComponent(itemId) + '/bookmark/' + time);
 	}
 
 	/** Mark a book finished (or not) for this listener. */

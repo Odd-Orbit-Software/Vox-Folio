@@ -4,7 +4,7 @@ import type {KeyboardEvent as ReactKeyboardEvent} from 'react';
 import {Clock} from '../components/Clock';
 import {Button, Cover, Icon, Tile} from '../components/controls';
 import {focusWithin, PanelScope, pinScroll, ScreenContainer} from '../components/ScreenContainer';
-import type {Chapter} from '../abs/types';
+import type {Bookmark, Chapter} from '../abs/types';
 import {bookLabel} from '../app/series';
 import type {SeriesEntry} from '../app/series';
 import type {SleepDefault} from '../app/settings';
@@ -30,9 +30,12 @@ interface PlayerProps {
 	skipForward: number;
 	/** What the sleep panel offers first. */
 	sleepDefault: SleepDefault;
+	bookmarks: Bookmark[];
+	onAddBookmark: () => void;
+	onRemoveBookmark: (b: Bookmark) => void;
 }
 
-type Panel = 'none' | 'speed' | 'chapters' | 'sleep';
+type Panel = 'none' | 'speed' | 'chapters' | 'bookmarks' | 'sleep';
 
 const SLEEP_OPTIONS: SleepDefault[] = ['off', 'chapter', 15, 30, 45, 60];
 
@@ -99,34 +102,119 @@ const UP_NEXT_SECONDS = 15;
 /** Chapter rows are 82 px with a 6 px gap; must match .vf-chapter. */
 const CHAPTER_PITCH = 88;
 
-function ChaptersPanel ({chapters, current, onPick}: {chapters: Chapter[]; current: number; onPick: (c: Chapter) => void}) {
+interface NavPanelProps {
+	chapters: Chapter[];
+	current: number;
+	bookmarks: Bookmark[];
+	position: number;
+	startTab: 'chapters' | 'bookmarks';
+	onPick: (time: number) => void;
+	onAddBookmark: () => void;
+	onRemoveBookmark: (b: Bookmark) => void;
+}
+
+/** Chapters and bookmarks, one panel with two tabs (Red opens it on Chapters). */
+function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, onAddBookmark, onRemoveBookmark}: NavPanelProps) {
+	const [tab, setTab] = useState<'chapters' | 'bookmarks'>(chapters.length ? startTab : 'bookmarks');
 	const [focusRow, setFocusRow] = useState(Math.max(0, current));
+	const [bmRow, setBmRow] = useState(0);
+
+	// Right from a chapter shows Bookmarks; Left from a bookmark shows Chapters (no walking up to the tabs).
+	const switchTo = (next: 'chapters' | 'bookmarks') => (ev: ReactKeyboardEvent<HTMLElement>) => {
+		const key = next === 'bookmarks' ? Keys.RIGHT : Keys.LEFT;
+		if (ev.keyCode !== key || (next === 'chapters' && !chapters.length)) return;
+		ev.preventDefault();
+		ev.stopPropagation();
+		setTab(next);
+	};
+
+	// After a bookmark is removed (its row had focus), move to the next one, or to "Add".
+	const lastRemovedAt = useRef<number | null>(null);
+	const count = useRef(bookmarks.length);
+	useEffect(() => {
+		if (bookmarks.length < count.current && lastRemovedAt.current !== null) {
+			const at = Math.min(lastRemovedAt.current, bookmarks.length - 1);
+			focusWithin('nav-panel', at >= 0 ? 'bookmark:' + at : 'bookmark-add');
+			lastRemovedAt.current = null;
+		}
+		count.current = bookmarks.length;
+	}, [bookmarks.length]);
+
+	// After a tab change, focus lands on that tab's first useful item.
+	const firstTab = useRef(true);
+	useEffect(() => {
+		if (firstTab.current) {
+			firstTab.current = false;
+			return undefined;
+		}
+		const t = window.setTimeout(() => focusWithin('nav-panel', tab === 'chapters' ? 'chapter:' + Math.max(0, current) : 'bookmark-add'), 0);
+		return () => window.clearTimeout(t);
+	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 	return (
 		<>
 			<div className="vf-scrim" />
-			<PanelScope id="chapters-panel" className="vf-panel">
+			<PanelScope id="nav-panel" className="vf-panel">
 				<div className="vf-panel__head">
-					<h2 className="vf-panel__title">Chapters</h2>
-					<span className="vf-muted">{chapters.length + ' · Back to close'}</span>
+					<div className="vf-tabs" role="tablist">
+						{chapters.length > 0 && (
+							<Button variant="chip" role="tab" aria-selected={tab === 'chapters'} className={'vf-tab' + (tab === 'chapters' ? ' is-selected' : '')} onClick={() => setTab('chapters')} onFocus={() => setTab('chapters')}>
+								{'Chapters · ' + chapters.length}
+							</Button>
+						)}
+						<Button variant="chip" role="tab" aria-selected={tab === 'bookmarks'} className={'vf-tab' + (tab === 'bookmarks' ? ' is-selected' : '')} onClick={() => setTab('bookmarks')} onFocus={() => setTab('bookmarks')}>
+							{'Bookmarks · ' + bookmarks.length}
+						</Button>
+					</div>
+					<span className="vf-muted">Back to close</span>
 				</div>
-				<div className="vf-chapters" onScroll={pinScroll}>
-					<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, focusRow - 4) * CHAPTER_PITCH + 'px)'}}>
-						{chapters.map((c, i) => (
-							<li key={c.id + ':' + i}>
-								<Tile
-									className={'vf-chapter' + (i === current ? ' is-current' : '') + (i < current ? ' is-played' : '')}
-									data-default-focus={i === Math.max(0, current) || undefined}
-									onFocus={() => setFocusRow(i)}
-									onClick={() => onPick(c)}
-								>
-									<span className="vf-chapter__num">{i + 1}</span>
-									<span className="vf-chapter__title">{c.title}</span>
-									<span className="vf-chapter__meta">{i === current ? 'Playing' : formatClock(c.end - c.start)}</span>
-								</Tile>
+				{tab === 'chapters' ? (
+					<div className="vf-chapters" onScroll={pinScroll}>
+						<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, focusRow - 4) * CHAPTER_PITCH + 'px)'}}>
+							{chapters.map((c, i) => (
+								<li key={c.id + ':' + i}>
+									<Tile
+										className={'vf-chapter' + (i === current ? ' is-current' : '') + (i < current ? ' is-played' : '')}
+										data-default-focus={(startTab === 'chapters' && i === Math.max(0, current)) || undefined}
+										data-focus-key={'chapter:' + i}
+										onFocus={() => setFocusRow(i)}
+										onKeyDown={switchTo('bookmarks')}
+										onClick={() => onPick(c.start)}
+									>
+										<span className="vf-chapter__num">{i + 1}</span>
+										<span className="vf-chapter__title">{c.title}</span>
+										<span className="vf-chapter__meta">{i === current ? 'Playing' : formatClock(c.end - c.start)}</span>
+									</Tile>
+								</li>
+							))}
+						</ol>
+					</div>
+				) : (
+					<div className="vf-chapters" onScroll={pinScroll}>
+						<ol className="vf-chapters__list" style={{transform: 'translateY(' + -Math.max(0, bmRow - 4) * CHAPTER_PITCH + 'px)'}}>
+							<li>
+								<Button className="vf-bookmark-add" data-default-focus={startTab === 'bookmarks' || undefined} data-focus-key="bookmark-add" onFocus={() => setBmRow(0)} onKeyDown={switchTo('chapters')} onClick={onAddBookmark}>
+									<Icon name="bookmark" size={26} />{'Add a bookmark at ' + formatClock(position)}
+								</Button>
 							</li>
-						))}
-					</ol>
-				</div>
+							{bookmarks.map((b, i) => (
+								<li key={b.time + ':' + b.createdAt} className="vf-bookmark">
+									<Tile className="vf-chapter vf-bookmark__row" data-focus-key={'bookmark:' + i} onFocus={() => setBmRow(i + 1)} onKeyDown={switchTo('chapters')} onClick={() => onPick(b.time)} aria-label={b.title + ' at ' + formatClock(b.time)}>
+										<span className="vf-chapter__title">{b.title.replace(/ · [\d:]+$/, '')}</span>
+										<span className="vf-chapter__meta">{formatClock(b.time)}</span>
+									</Tile>
+									<Button variant="icon" className="vf-bookmark__remove" aria-label={'Remove bookmark ' + b.title} onFocus={() => setBmRow(i + 1)} onClick={() => {
+										lastRemovedAt.current = i;
+										onRemoveBookmark(b);
+									}}
+									>
+										<Icon name="close" size={26} />
+									</Button>
+								</li>
+							))}
+							{!bookmarks.length && <li className="vf-panel__note vf-bookmark__empty">No bookmarks in this book yet. They&apos;re shared with your other Audiobookshelf apps.</li>}
+						</ol>
+					</div>
+				)}
 			</PanelScope>
 		</>
 	);
@@ -205,7 +293,7 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault}: PlayerProps) {
+export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
 	const [panel, setPanel] = useState<Panel>('none');
 	const speedOpen = panel === 'speed';
 	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
@@ -223,7 +311,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 			else if (isBackKey(code) && showUpNext) onDeclineNext();
 			else if (isBackKey(code) && preview !== null) setPreview(null);
 			else if (code === Keys.GREEN) setPanel((o) => (o === 'speed' ? 'none' : 'speed'));
-			else if (code === Keys.RED && player.chapters.length) setPanel((o) => (o === 'chapters' ? 'none' : 'chapters'));
+			else if (code === Keys.RED) setPanel((o) => (o === 'chapters' || o === 'bookmarks' ? 'none' : 'chapters'));
 			else if (code === Keys.BLUE) onToggleAutoplay();
 			else if (code === Keys.YELLOW) setPanel((o) => (o === 'sleep' ? 'none' : 'sleep'));
 			else if (code === Keys.CH_UP && panel === 'none') engine.nextChapter();
@@ -241,7 +329,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 	// When a panel closes, put focus back on the button that opened it.
 	const wasOpen = useRef<Panel>('none');
 	useEffect(() => {
-		if (wasOpen.current !== 'none' && panel === 'none') focusWithin('player', wasOpen.current);
+		if (wasOpen.current !== 'none' && panel === 'none') focusWithin('player', wasOpen.current === 'bookmarks' ? 'chapters' : wasOpen.current);
 		wasOpen.current = panel;
 	}, [panel]);
 
@@ -398,11 +486,12 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						<Button variant="chip" data-focus-key="speed" onClick={() => setPanel('speed')}>
 							<span className="vf-dot vf-dot--green" />{formatRate(p.rate)}
 						</Button>
-						{p.chapters.length > 0 && (
-							<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel('chapters')}>
-								<span className="vf-dot vf-dot--red" />Chapters
-							</Button>
-						)}
+						<Button variant="icon" className="vf-round vf-round--small" aria-label="Add a bookmark here" data-focus-key="bookmark" onClick={onAddBookmark}>
+							<Icon name="bookmark" size={28} />
+						</Button>
+						<Button variant="chip" data-focus-key="chapters" onClick={() => setPanel(p.chapters.length ? 'chapters' : 'bookmarks')}>
+							<span className="vf-dot vf-dot--red" />{p.chapters.length ? 'Chapters' : 'Bookmarks'}
+						</Button>
 					</div>
 				</div>
 			</div>
@@ -419,14 +508,19 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 				/>
 			)}
 			{p.sleep && p.sleep.prompt && panel === 'none' && <StillListening sleep={p.sleep} />}
-			{panel === 'chapters' && (
-				<ChaptersPanel
+			{(panel === 'chapters' || panel === 'bookmarks') && (
+				<NavPanel
 					chapters={p.chapters}
 					current={p.chapterIndex}
-					onPick={(c) => {
-						engine.seek(c.start);
+					bookmarks={bookmarks}
+					position={p.position}
+					startTab={panel === 'bookmarks' ? 'bookmarks' : 'chapters'}
+					onPick={(t) => {
+						engine.seek(t);
 						setPanel('none');
 					}}
+					onAddBookmark={onAddBookmark}
+					onRemoveBookmark={onRemoveBookmark}
 				/>
 			)}
 			{showUpNext && next && (

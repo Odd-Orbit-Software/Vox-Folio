@@ -165,6 +165,8 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	const common = {width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true} as const;
 	const stroke = {fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'} as const;
 	switch (name) {
+		case 'bookmark': return <svg {...common}><path {...stroke} d="M6 3h12v18l-6-4-6 4z" /></svg>;
+		case 'close': return <svg {...common}><path {...stroke} d="M6 6l12 12M18 6L6 18" /></svg>;
 		case 'search': return <svg {...common}><g {...stroke}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></g></svg>;
 		case 'authors': return <svg {...common}><g {...stroke}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></g></svg>;
 		case 'settings': return <svg {...common}><g {...stroke}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></g></svg>;
@@ -192,4 +194,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

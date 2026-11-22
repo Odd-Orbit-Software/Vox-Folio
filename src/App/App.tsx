@@ -5,23 +5,30 @@ import {useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExtern
 import appinfo from '../../webos-meta/appinfo.json';
 import {AbsClient, login, normaliseServerUrl} from '../abs/client';
 import type {Credentials} from '../abs/client';
-import {deviceId, loadCredentials, saveCredentials} from '../abs/store';
+import type {Bookmark} from '../abs/types';
+import {deviceId} from '../abs/store';
 import {IdleWatcher} from '../app/idle';
 import {decideLaunch} from '../app/launch';
+import {activeProfile, addProfile, displayName, loadProfiles, removeProfile, saveProfiles, setActive, updateCreds} from '../app/profiles';
+import type {Profile, ProfileState} from '../app/profiles';
 import {pop, push, reset, TABS} from '../app/routes';
 import type {Entry, Route} from '../app/routes';
 import {nextInSeries} from '../app/series';
-import {getSettings, updateSettings, useSettings} from '../app/settings';
+import {isPremium} from '../app/premium';
+import {getSettings, selectProfileSettings, updateSettings, useSettings} from '../app/settings';
 import type {SeriesEntry} from '../app/series';
+import {ProfileContext} from '../components/ProfileContext';
 import {Screensaver} from '../components/Screensaver';
 import {Toasts} from '../components/Toasts';
 import type {Toast} from '../components/Toasts';
 import {devLogin, installErrorReporter, replayKeys, report, runProbe} from '../dev/probe';
 import {idlePlayerState, PlayerEngine} from '../player/engine';
+import {formatClock} from '../player/timeline';
 import type {PlayerState} from '../player/engine';
 import {controlTvScreensaver} from '../platform/screensaver';
 import {activate, exitApp, isBackKey, Keys, onRelaunch, readLaunchParams, requestedItemId} from '../platform/webos';
 import About from '../screens/About';
+import Profiles from '../screens/Profiles';
 import AuthorScreen from '../screens/Author';
 import Authors from '../screens/Authors';
 import BookList from '../screens/BookList';
@@ -79,15 +86,57 @@ function usePlayer (engine: PlayerEngine | null): PlayerState {
 }
 
 interface Session {
-	creds: Credentials;
+	profileId: string;
 	client: AbsClient;
 	engine: PlayerEngine;
 }
 
-function makeSession (creds: Credentials): Session {
-	const client = new AbsClient(creds, saveCredentials);
-	return {creds, client, engine: new PlayerEngine(client, audio, device)};
+/* Household profiles (★ Premium): kept in one module-level store so token rotation from any client
+   can update it, and mirrored into React with useSyncExternalStore. */
+let profileState: ProfileState = typeof window !== 'undefined' ? loadProfiles() : {profiles: [], activeId: null};
+const profileListeners = new Set<() => void>();
+
+function commitProfiles (next: ProfileState): void {
+	profileState = next;
+	saveProfiles(next);
+	profileListeners.forEach((fn) => fn());
 }
+
+const subscribeProfiles = (fn: () => void) => {
+	profileListeners.add(fn);
+	return () => {
+		profileListeners.delete(fn);
+	};
+};
+const getProfiles = () => profileState;
+
+function clientFor (profile: Profile): AbsClient {
+	return new AbsClient(profile.creds, (c) => commitProfiles(updateCreds(profileState, profile.id, c)));
+}
+
+function makeSession (profile: Profile): Session {
+	const client = clientFor(profile);
+	return {profileId: profile.id, client, engine: new PlayerEngine(client, audio, device)};
+}
+
+/** The profile a book should open for: whoever saved progress in it most recently, else the active one. */
+async function profileForItem (itemId: string): Promise<string | null> {
+	const {profiles, activeId} = profileState;
+	if (profiles.length < 2) return activeId || (profiles[0] ? profiles[0].id : null);
+	const found = await Promise.all(profiles.map((p) => clientFor(p).getProgress(itemId).catch(() => null)));
+	let best: string | null = null;
+	let bestAt = -1;
+	found.forEach((progress, i) => {
+		if (progress && progress.lastUpdate > bestAt) {
+			bestAt = progress.lastUpdate;
+			best = profiles[i].id;
+		}
+	});
+	return best || activeId || profiles[0].id;
+}
+
+const startProfile = activeProfile(profileState) || (profileState.profiles.length === 1 ? profileState.profiles[0] : null);
+selectProfileSettings(startProfile ? startProfile.id : null);
 
 interface UpNext {
 	forItemId: string;
@@ -95,11 +144,11 @@ interface UpNext {
 }
 
 function App () {
-	const [session, setSession] = useState<Session | null>(() => {
-		const saved = loadCredentials();
-		return saved ? makeSession(saved) : null;
-	});
-	const [stack, setStack] = useState<Entry[]>(() => reset(session ? {name: 'home'} : {name: 'setup'}));
+	const profiles = useSyncExternalStore(subscribeProfiles, getProfiles);
+	const [session, setSession] = useState<Session | null>(() => (startProfile ? makeSession(startProfile) : null));
+	const [stack, setStack] = useState<Entry[]>(() => reset(
+		profileState.profiles.length > 1 ? {name: 'profiles'} : session ? {name: 'home'} : {name: 'setup'}
+	));
 	const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 	const [authMessage, setAuthMessage] = useState('');
 	const [toasts, setToasts] = useState<Toast[]>([]);
@@ -110,7 +159,8 @@ function App () {
 
 	const client = session ? session.client : null;
 	const engine = session ? session.engine : null;
-	const creds = session ? session.creds : null;
+	const creds = client ? client.credentials : null;
+	const currentProfile = session ? profiles.profiles.filter((p) => p.id === session.profileId)[0] || null : null;
 	const player = usePlayer(engine);
 	const asleep = useSyncExternalStore(subscribeIdle, getIdle);
 	const settings = useSettings();
@@ -170,13 +220,34 @@ function App () {
 		setStack((st) => (st[st.length - 1].route.name === 'player' ? st : push(st, {name: 'player'}, fromKey)));
 	}, []);
 
+	/** Make a profile the active one: save and close the current book, then start its session. */
+	const switchProfile = useCallback((id: string): Session | null => {
+		const current = live.current.session;
+		if (current && current.profileId === id) return current;
+		const profile = profileState.profiles.filter((p) => p.id === id)[0];
+		if (!profile) return current;
+		if (current) current.engine.close();
+		commitProfiles(setActive(profileState, id));
+		selectProfileSettings(id);
+		const next = makeSession(profile);
+		live.current = {...live.current, session: next};
+		setSession(next);
+		setUpNext(null);
+		setDeclined([]);
+		return next;
+	}, []);
+
+	/** Sign the current profile out (or an expired one): it's removed from this TV. */
 	const signOut = useCallback((message = '') => {
 		const current = live.current.session;
-		if (current) current.engine.close();
-		saveCredentials(null);
+		if (current) {
+			current.engine.close();
+			commitProfiles(removeProfile(profileState, current.profileId));
+		}
 		setSession(null);
 		setAuthMessage(message);
-		setStack(reset({name: 'setup'}));
+		selectProfileSettings(null);
+		setStack(reset(profileState.profiles.length && !message ? {name: 'profiles'} : {name: 'setup'}));
 	}, []);
 
 	const openBook = useCallback((target: PlayerEngine, itemId: string, opts: {fromKey?: string | null; startAt?: number} = {}) => {
@@ -188,37 +259,49 @@ function App () {
 		target.open(itemId, true, opts.startAt);
 	}, [pushToast, showPlayer]);
 
-	/** Every title request from outside (Polaris, a relaunch) comes through here. */
+	/** Every title request from outside (Polaris, a relaunch) comes through here. With several
+	    profiles, the book opens for whoever listened to it last. */
 	const handleRequest = useCallback((itemId: string | null) => {
-		const current = live.current.session;
-		const action = decideLaunch(itemId, {
-			signedIn: Boolean(current),
-			currentItemId: current ? current.engine.getState().itemId : null
-		});
-		switch (action.type) {
-			case 'defer':
-				setPendingItemId(action.itemId);
-				setStack(reset({name: 'setup'}));
-				break;
-			case 'showPlayer':
-				showPlayer();
-				if (current) current.engine.catchUp();
-				break;
-			case 'open':
-				if (current) {
-					// Back from a launched book goes Home, whatever was open before.
-					setStack(push(reset({name: 'home'}), {name: 'player'}));
-					openBook(current.engine, action.itemId);
-				}
-				break;
-			default:
-				break;
+		const run = (current: Session | null) => {
+			const action = decideLaunch(itemId, {
+				signedIn: Boolean(current),
+				currentItemId: current ? current.engine.getState().itemId : null
+			});
+			switch (action.type) {
+				case 'defer':
+					setPendingItemId(action.itemId);
+					setStack(reset({name: 'setup'}));
+					break;
+				case 'showPlayer':
+					showPlayer();
+					if (current) current.engine.catchUp();
+					break;
+				case 'open':
+					if (current) {
+						// Back from a launched book goes Home, whatever was open before.
+						setStack(push(reset({name: 'home'}), {name: 'player'}));
+						openBook(current.engine, action.itemId);
+					}
+					break;
+				default:
+					break;
+			}
+		};
+		if (itemId && profileState.profiles.length > 1) {
+			profileForItem(itemId).then((id) => run(id ? switchProfile(id) : live.current.session), () => run(live.current.session));
+			return;
 		}
-	}, [openBook, showPlayer]);
+		run(live.current.session);
+	}, [openBook, showPlayer, switchProfile]);
 
 	const onSignedIn = useCallback((c: Credentials) => {
-		saveCredentials(c);
-		const next = makeSession(c);
+		const {state, profile} = addProfile(profileState, c);
+		const current = live.current.session;
+		if (current && current.profileId !== profile.id) current.engine.close();
+		commitProfiles(state);
+		selectProfileSettings(profile.id);
+		const next = makeSession(profile);
+		live.current = {...live.current, session: next};
 		setSession(next);
 		setAuthMessage('');
 		setStack(reset({name: 'home'}));
@@ -238,21 +321,27 @@ function App () {
 		installErrorReporter(params);
 		runProbe(params);
 		if (typeof params.probe === 'string' && typeof params.searchText === 'string') presetSearch(params.searchText);
-		const dev = devLogin(params);
-		if (dev && !live.current.session) {
+		// Development: sign in (or add a profile) without typing on the TV.
+		const devSignIn = (p: typeof params, then: () => void) => {
+			const dev = devLogin(p);
+			if (!dev) {
+				then();
+				return;
+			}
 			login(normaliseServerUrl(dev.server), dev.username, dev.password).then((c) => {
 				onSignedInRef.current(c);
-				replayKeys(params);
-			}, () => undefined);
-		} else {
-			replayKeys(params);
-		}
+				then();
+			}, then);
+		};
+		devSignIn(params, () => replayKeys(params));
 		handleRequest(requestedItemId(params));
 		return onRelaunch((p) => {
 			installErrorReporter(p);
 			runProbe(p);
-			handleRequest(requestedItemId(p));
-			replayKeys(p);
+			devSignIn(p, () => {
+				handleRequest(requestedItemId(p));
+				replayKeys(p);
+			});
 			activate();
 		});
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -271,6 +360,46 @@ function App () {
 			cancelled = true;
 		};
 	}, [client, player.itemId, player.series, player.libraryId]);
+
+	// Bookmarks in the book that's loaded (stored on the server, so other apps see them too).
+	const [bookmarks, setBookmarks] = useState<{itemId: string; list: Bookmark[]} | null>(null);
+	useEffect(() => {
+		const itemId = player.itemId;
+		if (!client || !itemId) return undefined;
+		let cancelled = false;
+		client.bookmarks(itemId).then((list) => {
+			if (!cancelled) setBookmarks({itemId, list});
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, player.itemId]);
+
+	const addBookmark = useCallback(() => {
+		const current = live.current.session;
+		if (!current) return;
+		const s = current.engine.getState();
+		if (!s.itemId) return;
+		const time = Math.floor(s.position);
+		const chapter = s.chapterIndex >= 0 ? s.chapters[s.chapterIndex] : null;
+		const title = (chapter ? chapter.title : s.title) + ' · ' + formatClock(time);
+		const itemId = s.itemId;
+		current.client.addBookmark(itemId, time, title).then((b) => {
+			setBookmarks((prev) => {
+				const list = (prev && prev.itemId === itemId ? prev.list : []).filter((x) => x.time !== b.time).concat(b);
+				return {itemId, list: list.sort((x, y) => x.time - y.time)};
+			});
+			pushToast('Bookmarked ' + formatClock(time));
+		}, () => pushToast("Couldn't save the bookmark"));
+	}, [pushToast]);
+
+	const removeBookmark = useCallback((b: Bookmark) => {
+		const current = live.current.session;
+		if (!current) return;
+		current.client.removeBookmark(b.libraryItemId, b.time).then(() => {
+			setBookmarks((prev) => (prev ? {...prev, list: prev.list.filter((x) => x.time !== b.time)} : prev));
+		}, () => pushToast("Couldn't remove the bookmark"));
+	}, [pushToast]);
 
 	const playNext = useCallback(() => {
 		const {session: current, upNext: un} = live.current;
@@ -362,8 +491,8 @@ function App () {
 			const loaded = Boolean(e && e.getState().itemId && e.getState().status !== 'error');
 			if (isBackKey(code)) {
 				ev.preventDefault();
-				if (r.name === 'setup') exitApp();
-				else if (stackDepth > 1) setStack(pop);
+				if (stackDepth > 1) setStack(pop);
+				else if (r.name === 'setup' || r.name === 'profiles') exitApp();
 				else if (r.name !== 'home') setStack(reset({name: 'home'}));
 				else if (loaded) setStack((st) => push(st, {name: 'player'}));
 				else exitApp();
@@ -402,11 +531,31 @@ function App () {
 	const onSettings = () => onTab('settings');
 	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
 
+	const profileInfo = currentProfile ? {
+		name: displayName(currentProfile),
+		shared: profiles.profiles.length > 1,
+		onOpen: () => go({name: 'profiles'}, 'rail:profile')
+	} : null;
+
 	return (
+		<ProfileContext.Provider value={profileInfo}>
 		<div className="vf-stage">
+			{route.name === 'profiles' && (
+				<Profiles
+					profiles={profiles.profiles}
+					activeId={session ? session.profileId : profiles.activeId}
+					onPick={(id) => {
+						if (switchProfile(id)) setStack(reset({name: 'home'}));
+					}}
+					onAdd={() => {
+						if (isPremium()) go({name: 'setup', adding: true}, 'profile:add');
+						else pushToast('Adding people is part of Vox Folio Premium');
+					}}
+				/>
+			)}
 			{route.name === 'setup' && (
 				<Setup
-					initialServer={creds ? creds.serverUrl : ''}
+					initialServer={creds ? creds.serverUrl : profiles.profiles[0] ? profiles.profiles[0].creds.serverUrl : ''}
 					message={authMessage}
 					pendingItemId={pendingItemId}
 					onSignedIn={onSignedIn}
@@ -540,6 +689,9 @@ function App () {
 					skipBack={settings.skipBack}
 					skipForward={settings.skipForward}
 					sleepDefault={settings.sleepDefault}
+					bookmarks={bookmarks && bookmarks.itemId === player.itemId ? bookmarks.list : []}
+					onAddBookmark={addBookmark}
+					onRemoveBookmark={removeBookmark}
 				/>
 			)}
 			{route.name === 'settings' && (
@@ -561,8 +713,9 @@ function App () {
 				/>
 			)}
 			<Toasts toasts={toasts} />
-			{asleep && <Screensaver player={player} />}
+			{asleep && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} />}
 		</div>
+		</ProfileContext.Provider>
 	);
 }
 
