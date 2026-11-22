@@ -5,6 +5,7 @@ import type {FocusEvent, KeyboardEvent, ReactNode} from 'react';
 import {Keys} from '../platform/webos';
 
 import {Cover, Tile} from './controls';
+import {Marquee} from './marquee';
 import type {GridItem} from './CoverGrid';
 import {pinScroll} from './ScreenContainer';
 
@@ -61,7 +62,7 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus}: CoverRow
 									<div className="vf-bar vf-grid__bar"><div className="vf-bar__fill" style={{width: item.percent + '%'}} /></div>
 								)}
 							</div>
-							<div className="vf-book__title">{item.title}</div>
+							<Marquee className="vf-book__title">{item.title}</Marquee>
 							<div className="vf-book__meta">{item.subtitle}</div>
 						</Tile>
 					))}

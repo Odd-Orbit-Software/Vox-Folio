@@ -1,6 +1,7 @@
 import {memo, useLayoutEffect, useRef, useState} from 'react';
 
 import {Cover, Tile} from './controls';
+import {Marquee} from './marquee';
 import {pinScroll} from './ScreenContainer';
 
 export interface GridItem {
@@ -49,7 +50,7 @@ const GridTile = memo(function GridTileView ({item, index, isDefault, onFocusInd
 					<div className="vf-bar vf-grid__bar"><div className="vf-bar__fill" style={{width: item.percent + '%'}} /></div>
 				)}
 			</div>
-			<div className="vf-book__title">{item.title}</div>
+			<Marquee className="vf-book__title">{item.title}</Marquee>
 			<div className="vf-book__meta">{item.subtitle}</div>
 		</Tile>
 	);

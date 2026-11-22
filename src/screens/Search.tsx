@@ -1,7 +1,9 @@
 import {useEffect, useState} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
-import type {MediaProgress, SearchResults} from '../abs/types';
+import type {MediaProgress, PodcastEpisode, PodcastSearchResults, SearchResults} from '../abs/types';
+import {podcastLibraryId} from '../app/podcasts';
+import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
 import {orderSeries} from '../app/series';
 import {Button, TextField} from '../components/controls';
@@ -11,6 +13,7 @@ import {CoverRow, VScroll} from '../components/Rows';
 import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {resolveLibraryId, toGridItem} from './Library';
+import {episodeTile, showTile} from './Podcasts';
 
 interface SearchProps {
 	client: AbsClient;
@@ -21,13 +24,19 @@ interface SearchProps {
 	onOpenSeries: (libraryId: string, seriesId: string, seriesName: string, fromKey: string) => void;
 	onOpenAuthor: (authorId: string, name: string, fromKey: string) => void;
 	onOpenNarrator: (libraryId: string, name: string, fromKey: string) => void;
+	onOpenShow: (itemId: string, title: string, fromKey: string) => void;
+	onPlayEpisode: (itemId: string, episodeId: string, fromKey: string) => void;
 }
 
 interface Found {
 	query: string;
 	libraryId: string;
-	results: SearchResults;
+	results: SearchResults | null;
+	/** ★ When the account has a podcast library. */
+	podcasts: PodcastSearchResults | null;
 }
+
+const noPodcasts = Promise.resolve(null);
 
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 350;
@@ -44,13 +53,15 @@ export function presetSearch (query: string): void {
 	last = {query, found: null};
 }
 
-/** Search by title, author, narrator or series. The TV keyboard's microphone works here too. */
-export default function Search ({client, restoreKey, onTab, onSettings, onOpenTitle, onOpenSeries, onOpenAuthor, onOpenNarrator}: SearchProps) {
+/** Search by title, author, narrator or series, and podcasts. The TV keyboard's microphone works here too. */
+export default function Search ({client, restoreKey, onTab, onSettings, onOpenTitle, onOpenSeries, onOpenAuthor, onOpenNarrator, onOpenShow, onPlayEpisode}: SearchProps) {
 	const [query, setQuery] = useState(last.query);
 	const [found, setFound] = useState<Found | null>(last.found);
 	const [progress, setProgress] = useState<Record<string, MediaProgress>>({});
 	const [error, setError] = useState<AbsError | null>(null);
 	const [retries, setRetries] = useState(0);
+	/** With matches in both, show everything or just one kind. */
+	const [scope, setScope] = useState<'all' | 'books' | 'podcasts'>('all');
 
 	useEffect(() => {
 		let cancelled = false;
@@ -68,11 +79,14 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 		if (q.length < MIN_CHARS) return undefined;
 		let cancelled = false;
 		const timer = window.setTimeout(() => {
-			resolveLibraryId(client).then((libraryId) => {
-				if (!libraryId) return undefined;
-				return client.search(libraryId, q).then((results) => {
+			Promise.all([resolveLibraryId(client), isPremium() ? podcastLibraryId(client) : null]).then(([libraryId, podcastId]) => {
+				if (!libraryId && !podcastId) return undefined;
+				return Promise.all([
+					libraryId ? client.search(libraryId, q) : null,
+					podcastId ? client.searchPodcasts(podcastId, q) : noPodcasts
+				]).then(([results, podcasts]) => {
 					if (cancelled) return;
-					const next = {query: q, libraryId, results};
+					const next = {query: q, libraryId: libraryId || '', results, podcasts};
 					setFound(next);
 					setError(null);
 					remember(query, next);
@@ -118,7 +132,23 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 		percent: null,
 		round: true
 	})) : [];
-	const nothing = r && !books.length && !series.length && !authors.length && !r.narrators.length;
+	const pr = showing ? showing.podcasts : null;
+	const shows: GridItem[] = pr ? pr.podcast.map(({libraryItem: s}) => showTile(client, s)) : [];
+	const episodes: GridItem[] = pr ? pr.episodes
+		.map(({libraryItem: s}) => (s.recentEpisode ? {...s.recentEpisode, libraryItemId: s.id} as PodcastEpisode : null))
+		.filter((e): e is PodcastEpisode => Boolean(e))
+		.map((e) => episodeTile(client, e, progress)) : [];
+	const anyBooks = books.length + series.length + authors.length + (r ? r.narrators.length : 0) > 0;
+	const anyPodcasts = shows.length + episodes.length > 0;
+	// With matches in both, chips at the top choose all, audiobooks or podcasts, and in "All" a small
+	// heading over each half keeps them apart.
+	const both = anyBooks && anyPodcasts;
+	const showBooks = !both || scope !== 'podcasts';
+	const showPodcasts = !both || scope !== 'books';
+	const grouped = both && scope === 'all';
+	const bookCount = books.length + series.length + authors.length + (r ? r.narrators.length : 0);
+	const podcastCount = shows.length + episodes.length;
+	const nothing = showing && !anyBooks && !anyPodcasts;
 
 	return (
 		<ScreenContainer id="search" className="vf-browse vf-search" restoreKey={restoreKey}>
@@ -141,10 +171,20 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 				{error && <ErrorPanel error={error} onRetry={() => setRetries((n) => n + 1)} />}
 				{q.length > 0 && q.length < MIN_CHARS && <p className="vf-search__hint" data-vrow>Keep typing…</p>}
 				{nothing && <p className="vf-search__hint" data-vrow>{'Nothing matches “' + showing!.query + '”.'}</p>}
-				{books.length > 0 && <CoverRow title="Books" meta={String(books.length)} items={books} onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)} />}
-				{series.length > 0 && showing && <CoverRow title="Series" items={series} onSelect={(g) => onOpenSeries(showing.libraryId, g.key.slice(7), g.title, g.key)} />}
-				{authors.length > 0 && <CoverRow title="Authors" items={authors} onSelect={(g) => onOpenAuthor(g.key.slice(7), g.title, g.key)} />}
-				{r && r.narrators.length > 0 && showing && (
+				{both && (
+					<div className="vf-chips vf-search__scope" data-vrow role="radiogroup" aria-label="Show">
+						{([['all', 'All'], ['books', 'Audiobooks · ' + bookCount], ['podcasts', 'Podcasts · ' + podcastCount]] as const).map(([id, label]) => (
+							<Button key={id} variant="chip" role="radio" aria-checked={scope === id} className={scope === id ? 'is-active' : ''} data-focus-key={'scope:' + id} onClick={() => setScope(id)}>
+								{label}
+							</Button>
+						))}
+					</div>
+				)}
+				{grouped && <h2 className="vf-search__group">Audiobooks</h2>}
+				{showBooks && books.length > 0 && <CoverRow title="Books" meta={String(books.length)} items={books} onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)} />}
+				{showBooks && series.length > 0 && showing && <CoverRow title="Series" items={series} onSelect={(g) => onOpenSeries(showing.libraryId, g.key.slice(7), g.title, g.key)} />}
+				{showBooks && authors.length > 0 && <CoverRow title="Authors" items={authors} onSelect={(g) => onOpenAuthor(g.key.slice(7), g.title, g.key)} />}
+				{showBooks && r && r.narrators.length > 0 && showing && (
 					<section className="vf-crow" data-vrow aria-label="Narrators">
 						<h2 className="vf-crow__title">Narrators</h2>
 						<div className="vf-chips">
@@ -155,6 +195,19 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 							))}
 						</div>
 					</section>
+				)}
+				{grouped && <h2 className="vf-search__group">Podcasts</h2>}
+				{showPodcasts && shows.length > 0 && <CoverRow title="Shows" items={shows} onSelect={(g) => onOpenShow(g.key.slice(5), g.title, g.key)} />}
+				{showPodcasts && episodes.length > 0 && (
+					<CoverRow
+						title="Episodes"
+						meta={String(episodes.length)}
+						items={episodes}
+						onSelect={(g) => {
+							const [itemId, episodeId] = g.key.slice(3).split('/');
+							onPlayEpisode(itemId, episodeId, g.key);
+						}}
+					/>
 				)}
 			</VScroll>
 		</ScreenContainer>

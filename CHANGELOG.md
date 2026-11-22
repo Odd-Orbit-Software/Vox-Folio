@@ -9,6 +9,12 @@ middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 - A Podcasts tab when your server has a podcast library: continue listening, the latest episodes, and every show.
 - A show's page lists its episodes, newest first, with what you've played and what's new.
 - Episodes play, sync, and resume like books, and are marked played at the end.
+- Autoplay goes on to the next episode (in the order they came out), with the same Up Next card as books.
+- Home shows episodes you're partway through alongside your books, and a New episodes row.
+- Podcasts keep their own playback speed, separate from books (starting at 1×).
+- Long titles scroll sideways while focused, so they can be read in full.
+- A show's page describes the focused episode.
+- Search finds shows and episodes too. When both books and podcasts match, chips choose All, Audiobooks, or Podcasts.
 - Polaris (or any launcher) can open an episode with `{"abs": "<show>", "episode": "<episode>"}`.
 
 ## 0.2.1

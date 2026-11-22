@@ -5,6 +5,7 @@ import type {LibraryItem, MediaProgress, PodcastEpisode} from '../abs/types';
 import {episodeLength, episodeState, episodeTitle, plainText} from '../app/podcasts';
 import {Cover, Icon, Tile} from '../components/controls';
 import {ErrorPanel} from '../components/ErrorPanel';
+import {Marquee} from '../components/marquee';
 import {pinScroll, ScreenContainer} from '../components/ScreenContainer';
 import type {PlayerState} from '../player/engine';
 
@@ -58,7 +59,10 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 	const ready = load.state === 'ready' ? load : null;
 	const md = ready ? ready.show.media.metadata : null;
 	const episodes = ready ? ready.episodes : [];
-	const description = md ? plainText(md.description) : '';
+	// The header describes the focused episode (feeds put the useful detail there), or the show.
+	const focused = episodes[focusRow];
+	const episodeAbout = focused ? plainText(focused.description) : '';
+	const description = episodeAbout || (md ? plainText(md.description) : '');
 
 	return (
 		<ScreenContainer id="podcast-show" className="vf-series vf-show" restoreKey={restoreKey} focusDeps={[load.state]}>
@@ -101,7 +105,7 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 								>
 									<span className="vf-series__seq vf-show__date">{day}<span className="vf-show__month">{monthYear}</span></span>
 									<span className="vf-series__info">
-										<span className="vf-series__book">{episodeTitle(e)}</span>
+										<Marquee className="vf-series__book">{episodeTitle(e)}</Marquee>
 										<span className="vf-series__meta">{playing ? 'Playing now' : episodeLength(e, s)}</span>
 									</span>
 									<span className="vf-series__state">

@@ -2,7 +2,10 @@ import {useEffect, useRef, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
-import type {LibraryItem, MediaProgress, Shelf} from '../abs/types';
+import {progressKey} from '../abs/client';
+import type {LibraryItem, MediaProgress, PodcastEpisode, Shelf} from '../abs/types';
+import {episodeDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
+import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
 import {Button, Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
@@ -15,6 +18,7 @@ import type {PlayerState} from '../player/engine';
 import {formatDuration} from '../player/timeline';
 import {Keys} from '../platform/webos';
 import {resolveLibraryId, toGridItem} from './Library';
+import {episodeKey, episodeTile} from './Podcasts';
 
 interface HomeProps {
 	client: AbsClient;
@@ -23,6 +27,8 @@ interface HomeProps {
 	/** Play (or bring forward) a book; `fromKey` is the item to refocus on return. */
 	onPlay: (itemId: string, fromKey: string) => void;
 	onDetails: (itemId: string, fromKey: string) => void;
+	onPlayEpisode: (itemId: string, episodeId: string, fromKey: string) => void;
+	onOpenShow: (itemId: string, title: string, fromKey: string) => void;
 	onShowPlayer: (fromKey: string) => void;
 	onTab: (name: Route['name']) => void;
 	onSettings: () => void;
@@ -31,6 +37,8 @@ interface HomeProps {
 interface Entry {
 	item: LibraryItem;
 	progress: MediaProgress | null;
+	/** Set when this is a podcast episode in progress (item is then the show). */
+	episode?: PodcastEpisode;
 }
 
 type Load = {state: 'loading'} | {state: 'error'; error: AbsError} | {state: 'ready'; entries: Entry[]; progress: Record<string, MediaProgress>};
@@ -41,6 +49,8 @@ interface HomeCache {
 	entries: Entry[];
 	progress: Record<string, MediaProgress>;
 	shelves: Shelf[];
+	/** ★ The podcast library's newest episodes. */
+	episodes?: PodcastEpisode[];
 }
 
 function cacheKey (client: AbsClient): string {
@@ -72,7 +82,7 @@ const SHELVES: {id: string; label: string; prefix: string}[] = [
 ];
 
 function remaining (e: Entry): string {
-	const duration = e.item.media.duration || (e.progress ? e.progress.duration : 0);
+	const duration = (e.episode ? e.episode.duration : e.item.media.duration) || (e.progress ? e.progress.duration : 0) || 0;
 	if (!e.progress || !duration) return formatDuration(duration);
 	return formatDuration(Math.max(0, duration - e.progress.currentTime)) + ' left';
 }
@@ -81,7 +91,7 @@ function percent (e: Entry): number {
 	return e.progress ? Math.round(e.progress.progress * 100) : 0;
 }
 
-export default function Home ({client, player, restoreKey, onPlay, onDetails, onShowPlayer, onTab, onSettings}: HomeProps) {
+export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings}: HomeProps) {
 	const [cached] = useState(() => readCache(client));
 	const [load, setLoad] = useState<Load>(() => (cached && cached.entries.length
 		? {state: 'ready', entries: cached.entries, progress: cached.progress}
@@ -93,11 +103,14 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 
 	useEffect(() => {
 		let cancelled = false;
-		Promise.all([client.itemsInProgress(12), client.progressByItem()]).then(([items, progress]) => {
+		Promise.all([client.itemsInProgress(13, isPremium()), client.progressByItem()]).then(([items, progress]) => {
 			if (cancelled) return;
 			// Development: time from launch to fresh Home data (no-op without `probe`).
 			report({kind: 'perf', homeFreshMs: Math.round(performance.now()), fromCache: Boolean(cached)});
-			const entries = items.map((item) => ({item, progress: progress[item.id] || null}));
+			const entries: Entry[] = items.map((item) => {
+				const episode = item.recentEpisode ? {...item.recentEpisode, libraryItemId: item.id} : undefined;
+				return {item, episode, progress: progress[progressKey(item.id, episode ? episode.id : null)] || null};
+			});
 			setLoad({state: 'ready', entries, progress});
 			// Keep only what Home shows, so the cache stays small.
 			const shown: Record<string, MediaProgress> = {};
@@ -131,6 +144,21 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 		};
 	}, [client, reload]);
 
+	// ★ New podcast episodes, when the account has a podcast library.
+	const [episodes, setEpisodes] = useState<PodcastEpisode[]>(() => (cached && cached.episodes) || []);
+	useEffect(() => {
+		let cancelled = false;
+		if (!isPremium()) return undefined;
+		podcastLibraryId(client).then((id) => (id ? client.recentEpisodes(id, 12) : [])).then((list) => {
+			if (cancelled) return;
+			setEpisodes(list);
+			writeCache(client, {episodes: list.map((e) => ({...e, description: ''}))});
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client, reload]);
+
 	const retry = () => {
 		setStale(null);
 		setLoad((prev) => (prev.state === 'ready' ? prev : {state: 'loading'}));
@@ -154,7 +182,19 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	const hero = entries[0];
 	const rest = entries.slice(1, 13);
 	const progress = load.state === 'ready' ? load.progress : {};
-	const restItems: GridItem[] = rest.map((e) => ({...toGridItem(client, e.item, progress[e.item.id]), subtitle: remaining(e), percent: percent(e)}));
+	const restItems: GridItem[] = rest.map((e) => (e.episode
+		? episodeTile(client, e.episode, progress)
+		: {...toGridItem(client, e.item, progress[e.item.id]), subtitle: remaining(e), percent: percent(e)}));
+	const newEpisodes: GridItem[] = episodes.map((e) => ({...episodeTile(client, e, progress), key: 'new' + episodeKey(e)}));
+	// Tiles are "book:<id>" or "ep:<show>/<episode>"; "newep:" for the New episodes row.
+	const openTile = (g: GridItem) => {
+		const ep = /^(?:new)?ep:([^/]+)\/(.+)$/.exec(g.key);
+		if (ep) onPlayEpisode(ep[1], ep[2], g.key);
+		else onPlay(g.key.slice(5), g.key);
+	};
+	const heroEp = hero ? hero.episode : undefined;
+	const heroKey = hero ? progressKey(hero.item.id, heroEp ? heroEp.id : null) : '';
+	const heroIsLoaded = Boolean(hero && player.itemId && progressKey(player.itemId, player.episodeId) === heroKey);
 	const extraRows = SHELVES.map((def) => {
 		const shelf = shelves.filter((sh) => sh.id === def.id && sh.type === 'book')[0];
 		const items: GridItem[] = shelf ? shelf.entities.map((item) => ({...toGridItem(client, item, progress[item.id]), key: def.prefix + ':' + item.id})) : [];
@@ -199,7 +239,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				{load.state === 'ready' && !hero && (
 					<div className="vf-message vf-home__empty" data-vrow>
 						<h1 className="vf-message__title">Nothing in progress yet</h1>
-						<p className="vf-message__body">Books you start will appear here.</p>
+						<p className="vf-message__body">Whatever you start listening to will appear here.</p>
 						{nowPlaying && (
 							<div className="vf-row">
 								<Button variant="primary" data-default-focus onClick={() => onShowPlayer('now-playing')}>Back to the player</Button>
@@ -212,12 +252,16 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 						<Cover url={client.coverUrl(hero.item.id, 680)} title={hero.item.media.metadata.title} author={hero.item.media.metadata.authorName} size={340} className="vf-hero__cover" />
 						<div className="vf-hero__body">
 							<div className="vf-eyebrow">Continue listening</div>
-							<div className="vf-hero__title">{hero.item.media.metadata.title}</div>
-							<div className="vf-hero__meta">
-								{hero.item.media.metadata.authorName}
-								{hero.item.media.metadata.narratorName ? ' · read by ' + hero.item.media.metadata.narratorName : ''}
-								{hero.item.media.metadata.seriesName ? ' · ' + hero.item.media.metadata.seriesName : ''}
-							</div>
+							<div className="vf-hero__title">{heroEp ? episodeTitle(heroEp) : hero.item.media.metadata.title}</div>
+							{heroEp ? (
+								<div className="vf-hero__meta">{[hero.item.media.metadata.title, episodeDate(heroEp)].filter(Boolean).join(' · ')}</div>
+							) : (
+								<div className="vf-hero__meta">
+									{hero.item.media.metadata.authorName}
+									{hero.item.media.metadata.narratorName ? ' · read by ' + hero.item.media.metadata.narratorName : ''}
+									{hero.item.media.metadata.seriesName ? ' · ' + hero.item.media.metadata.seriesName : ''}
+								</div>
+							)}
 							<div className="vf-progress-line">
 								<div className="vf-bar vf-bar--hero"><div className="vf-bar__fill" style={{width: percent(hero) + '%'}} /></div>
 								<span>{percent(hero) + '% · ' + remaining(hero)}</span>
@@ -226,24 +270,31 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 								<Button
 									variant="primary"
 									data-default-focus
-									data-focus-key={'hero:' + hero.item.id}
-									onClick={() => onPlay(hero.item.id, 'hero:' + hero.item.id)}
+									data-focus-key={'hero:' + heroKey}
+									onClick={() => (heroEp ? onPlayEpisode(hero.item.id, heroEp.id, 'hero:' + heroKey) : onPlay(hero.item.id, 'hero:' + heroKey))}
 								>
 									<Icon name="play" size={26} />
-									{player.itemId === hero.item.id ? 'Back to player' : 'Resume'}
+									{heroIsLoaded ? 'Back to player' : 'Resume'}
 								</Button>
-								<Button data-focus-key={'details:' + hero.item.id} onClick={() => onDetails(hero.item.id, 'details:' + hero.item.id)}>Details</Button>
+								{heroEp ? (
+									<Button data-focus-key={'show:' + hero.item.id} onClick={() => onOpenShow(hero.item.id, hero.item.media.metadata.title, 'show:' + hero.item.id)}>All episodes</Button>
+								) : (
+									<Button data-focus-key={'details:' + hero.item.id} onClick={() => onDetails(hero.item.id, 'details:' + hero.item.id)}>Details</Button>
+								)}
 							</div>
 						</div>
 					</section>
 				)}
 
 				{rest.length > 0 && (
-					<CoverRow title="In progress" items={restItems} onSelect={(g) => onPlay(g.key.slice(5), g.key)} />
+					<CoverRow title="In progress" items={restItems} onSelect={openTile} />
 				)}
 				{extraRows.map((r, i) => (
 					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && i === 0} onSelect={(g) => onDetails(g.key.slice(r.prefix.length + 1), g.key)} />
 				))}
+				{newEpisodes.length > 0 && (
+					<CoverRow title="New episodes" items={newEpisodes} defaultFocus={!hero && !nowPlaying && !extraRows.length} onSelect={openTile} />
+				)}
 			</VScroll>
 			</div>
 		</ScreenContainer>

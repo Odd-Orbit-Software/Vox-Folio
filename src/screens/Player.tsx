@@ -6,7 +6,7 @@ import {Button, Cover, Icon, Tile} from '../components/controls';
 import {focusWithin, PanelScope, pinScroll, ScreenContainer} from '../components/ScreenContainer';
 import type {Bookmark, Chapter} from '../abs/types';
 import {bookLabel} from '../app/series';
-import type {SeriesEntry} from '../app/series';
+import type {NextUp} from '../app/upnext';
 import type {SleepDefault} from '../app/settings';
 import type {PlayerEngine, PlayerState, SleepState} from '../player/engine';
 import {
@@ -18,8 +18,8 @@ interface PlayerProps {
 	engine: PlayerEngine;
 	player: PlayerState;
 	autoplay: boolean;
-	/** The next book in the series when autoplay will play it, else null. */
-	next: SeriesEntry | null;
+	/** The next book in the series (or a podcast's next episode) when autoplay will play it, else null. */
+	next: NextUp | null;
 	nextCoverUrl: string;
 	onToggleAutoplay: () => void;
 	onPlayNext: () => void;
@@ -49,12 +49,13 @@ interface SleepPanelProps {
 	sleep: SleepState | null;
 	preferred: SleepDefault;
 	onPick: (c: SleepDefault) => void;
-	/** Shown for books in a series: whether the next one plays on its own. */
+	/** Shown for books in a series and podcast episodes: whether the next one plays on its own. */
 	autoplay: boolean | null;
+	episode: boolean;
 	onToggleAutoplay: () => void;
 }
 
-function SleepPanel ({sleep, preferred, onPick, autoplay, onToggleAutoplay}: SleepPanelProps) {
+function SleepPanel ({sleep, preferred, onPick, autoplay, episode, onToggleAutoplay}: SleepPanelProps) {
 	const active: SleepDefault | null = !sleep ? 'off' : sleep.mode === 'chapter' ? 'chapter' : null;
 	const focusOn = active && active !== 'off' ? active : preferred;
 	return (
@@ -81,7 +82,7 @@ function SleepPanel ({sleep, preferred, onPick, autoplay, onToggleAutoplay}: Sle
 				<p className="vf-panel__note">Fades out at the end. Press any key at &ldquo;Still listening?&rdquo; to keep going.</p>
 				{autoplay !== null && (
 					<Button className={'vf-sleep__option vf-sleep__autoplay' + (autoplay ? ' is-selected' : '')} data-focus-key="autoplay" onClick={onToggleAutoplay}>
-						<Icon name="autoplay" size={28} />{autoplay ? 'Autoplay the next book: on' : 'Autoplay the next book: off'}
+						<Icon name="autoplay" size={28} />{'Autoplay the next ' + (episode ? 'episode' : 'book') + (autoplay ? ': on' : ': off')}
 					</Button>
 				)}
 			</PanelScope>
@@ -234,17 +235,17 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 	);
 }
 
-function UpNextCard ({next, coverUrl, seconds, onPlay, onDecline}: {next: SeriesEntry; coverUrl: string; seconds: number; onPlay: () => void; onDecline: () => void}) {
-	const md = next.item.media.metadata;
+function UpNextCard ({next, coverUrl, seconds, onPlay, onDecline}: {next: NextUp; coverUrl: string; seconds: number; onPlay: () => void; onDecline: () => void}) {
+	const label = next.episodeId ? next.date : next.sequence ? bookLabel(next.sequence) : '';
 	return (
 		<>
 			<div className="vf-scrim vf-scrim--light" />
 			<PanelScope id="up-next" className="vf-upnext">
-				<Cover url={coverUrl} title={md.title} author={md.authorName} size={260} className="vf-upnext__cover" />
+				<Cover url={coverUrl} title={next.title} author={next.author} size={260} className="vf-upnext__cover" />
 				<div className="vf-upnext__body">
-					<div className="vf-eyebrow vf-eyebrow--brass">{'Up next' + (next.sequence ? ' · ' + bookLabel(next.sequence) : '')}</div>
-					<div className="vf-upnext__title">{md.title}</div>
-					<div className="vf-upnext__meta">{'Starts in ' + seconds + 's · this book will be marked finished'}</div>
+					<div className="vf-eyebrow vf-eyebrow--brass">{'Up next' + (label ? ' · ' + label : '')}</div>
+					<div className="vf-upnext__title">{next.title}</div>
+					<div className="vf-upnext__meta">{'Starts in ' + seconds + 's · ' + (next.episodeId ? 'this episode will be marked played' : 'this book will be marked finished')}</div>
 					<div className="vf-bar vf-upnext__bar"><div className="vf-bar__fill vf-upnext__fill" style={{width: Math.max(0, 100 - seconds / UP_NEXT_SECONDS * 100) + '%'}} /></div>
 					<div className="vf-row vf-row--spaced">
 						<Button variant="primary" data-default-focus onClick={onPlay}>Play now</Button>
@@ -414,7 +415,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 				<span className="vf-hint"><Icon name="chevronDown" size={24} />Back to browsing</span>
 				<Clock className="vf-player__time" />
 				<span className="vf-player__status">
-					{p.series && (
+					{(p.series || p.episodeId) && (
 						<span className={'vf-hint vf-player__autoplay' + (autoplay ? ' is-on' : '')}>
 							<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
 						</span>
@@ -524,7 +525,8 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 						engine.setSleep(c);
 						setPanel('none');
 					}}
-					autoplay={p.series ? autoplay : null}
+					autoplay={p.series || p.episodeId ? autoplay : null}
+					episode={Boolean(p.episodeId)}
 					onToggleAutoplay={onToggleAutoplay}
 				/>
 			)}

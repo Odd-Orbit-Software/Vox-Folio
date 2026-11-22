@@ -2828,3 +2828,43 @@
 	letter-spacing: 0.04em;
 	color: var(--vf-muted);
 }
+
+.vf-search__group {
+	margin: 18px 0 -6px;
+	font: 500 20px/1 'Figtree', sans-serif;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--vf-brass);
+}
+
+.vf-search__scope {
+	margin: 4px -8px 14px;
+}
+
+/* ---- long titles ---------------------------------------------------------------------------- */
+
+/* The text is its own box with the ellipsis; while scrolling (focused, too long) it shows in full and
+   the title clips it. */
+.vf-marquee {
+	text-overflow: clip;
+}
+
+.vf-marquee__text {
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: top;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vf-marquee.is-scrolling .vf-marquee__text {
+	max-width: none;
+	overflow: visible;
+}
+
+/* Room below a shelf for the focused tile's title, which slides down as the cover zooms. */
+.vf-crow__viewport {
+	padding-bottom: 24px;
+	margin-bottom: -24px;
+}

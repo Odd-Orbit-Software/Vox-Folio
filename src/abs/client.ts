@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, SearchResults, Series, Shelf, SyncPayload} from './types';
+import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, PodcastSearchResults, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -256,9 +256,11 @@ export class AbsClient {
 		return out;
 	}
 
-	async itemsInProgress (limit = 12): Promise<LibraryItem[]> {
+	/** Books and (with `podcasts`) podcast episodes in progress, most recent first. A podcast item carries
+	    the episode as recentEpisode. */
+	async itemsInProgress (limit = 12, podcasts = false): Promise<LibraryItem[]> {
 		const data = await this.request<{libraryItems: LibraryItem[]}>('GET', '/api/me/items-in-progress?limit=' + limit);
-		return (data && data.libraryItems || []).filter((i) => i.mediaType === 'book');
+		return (data && data.libraryItems || []).filter((i) => i.mediaType === 'book' || (podcasts && i.mediaType === 'podcast' && Boolean(i.recentEpisode)));
 	}
 
 	async libraries (mediaType: Library['mediaType'] = 'book'): Promise<Library[]> {
@@ -307,6 +309,11 @@ export class AbsClient {
 
 	search (libraryId: string, query: string): Promise<SearchResults> {
 		return this.request<SearchResults>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/search?limit=12&q=' + encodeURIComponent(query));
+	}
+
+	async searchPodcasts (libraryId: string, query: string): Promise<PodcastSearchResults> {
+		const data = await this.request<Partial<PodcastSearchResults>>('GET', '/api/libraries/' + encodeURIComponent(libraryId) + '/search?limit=12&q=' + encodeURIComponent(query));
+		return {podcast: data && data.podcast || [], episodes: data && data.episodes || []};
 	}
 
 	/** Audiobookshelf's personalised Home shelves (continue series, recently added, discover…). */

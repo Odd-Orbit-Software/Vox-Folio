@@ -6,6 +6,7 @@ import {orderSeries} from '../app/series';
 import type {SeriesEntry} from '../app/series';
 import {Cover, Icon, Tile} from '../components/controls';
 import {ErrorPanel} from '../components/ErrorPanel';
+import {Marquee} from '../components/marquee';
 import {pinScroll, ScreenContainer} from '../components/ScreenContainer';
 import {formatDuration} from '../player/timeline';
 
@@ -95,7 +96,7 @@ export default function SeriesDetail ({client, libraryId, seriesId, seriesName, 
 									<span className="vf-series__seq">{e.sequence || '·'}</span>
 									<Cover url={e.item.media.coverPath ? client.coverUrl(e.item.id, 240) : ''} title={md.title} size={108} />
 									<span className="vf-series__info">
-										<span className="vf-series__book">{md.title}</span>
+										<Marquee className="vf-series__book">{md.title}</Marquee>
 										<span className="vf-series__meta">
 											{formatDuration(e.item.media.duration || 0)}
 											{chapters ? ' · ' + chapters + ' chapters' : ''}

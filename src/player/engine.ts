@@ -8,7 +8,7 @@
    - If syncing fails we keep going, show the unsynced state, and on reconnect check whether another
      device moved the book on before writing our older position over it. */
 
-import {AbsError} from '../abs/client';
+import {AbsError, progressKey} from '../abs/client';
 import type {AbsClient, DeviceInfo} from '../abs/client';
 import type {AudioTrack, Chapter, PlaybackSession, PodcastEpisode, SeriesRef} from '../abs/types';
 import {loadPlaybackRate, savePlaybackRate} from '../abs/store';
@@ -211,7 +211,8 @@ export class PlayerEngine {
 		await this.close();
 		if (token !== this.openToken) return;
 
-		this.set({...idlePlayerState, rate: this.state.rate, sleep: this.state.sleep, status: 'loading', itemId, episodeId});
+		// Books and podcasts each keep their own speed.
+		this.set({...idlePlayerState, rate: loadPlaybackRate(episodeId ? 'podcast' : 'book'), sleep: this.state.sleep, status: 'loading', itemId, episodeId});
 		this.pausedAt = null;
 		try {
 			const [item, session, progress] = await Promise.all([
@@ -263,7 +264,43 @@ export class PlayerEngine {
 			this.loadAt(position, autoplay);
 		} catch (e) {
 			if (token !== this.openToken) return;
+			// A show asked for without an episode (a launch with only the show's ID): the server can't play
+			// that, so play the episode in progress, else the newest one not yet played.
+			if (!episodeId) {
+				const episode = await this.episodeForShow(itemId);
+				if (token !== this.openToken) return;
+				if (episode) {
+					this.open(itemId, autoplay, startAt, episode);
+					return;
+				}
+			}
 			this.set({status: 'error', error: e instanceof AbsError ? e : new AbsError('server', String(e))});
+		}
+	}
+
+	/** For a podcast show: the episode in progress most recently, else the newest unplayed. Null for a book. */
+	private async episodeForShow (itemId: string): Promise<string | null> {
+		try {
+			const [item, progress] = await Promise.all([this.client.getItem(itemId), this.client.progressByItem()]);
+			if (item.mediaType !== 'podcast') return null;
+			const episodes = (item.media.episodes || []).slice().sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+			let best: string | null = null;
+			let bestAt = -1;
+			episodes.forEach((ep) => {
+				const p = progress[progressKey(itemId, ep.id)];
+				if (p && !p.isFinished && p.currentTime > 0 && p.lastUpdate > bestAt) {
+					bestAt = p.lastUpdate;
+					best = ep.id;
+				}
+			});
+			if (best) return best;
+			const unplayed = episodes.filter((ep) => {
+				const p = progress[progressKey(itemId, ep.id)];
+				return !p || !p.isFinished;
+			})[0];
+			return unplayed ? unplayed.id : null;
+		} catch {
+			return null;
 		}
 	}
 
@@ -502,7 +539,7 @@ export class PlayerEngine {
 	setRate (rate: number): void {
 		const r = clamp(Math.round(rate * 100) / 100, MIN_RATE, MAX_RATE);
 		this.rateCtl.apply(r);
-		savePlaybackRate(r);
+		savePlaybackRate(r, this.state.episodeId ? 'podcast' : 'book');
 		this.set({rate: r});
 	}
 

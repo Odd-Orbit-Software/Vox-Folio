@@ -49,13 +49,20 @@ export function deviceId (): string {
 	return id;
 }
 
-export function loadPlaybackRate (): number {
-	const n = Number(read(SPEED_KEY));
+/** Books and podcasts keep their own speed (books often faster). Books keep the original key. */
+export type SpeedKind = 'book' | 'podcast';
+
+function speedKey (kind: SpeedKind): string {
+	return kind === 'podcast' ? SPEED_KEY + '.podcast' : SPEED_KEY;
+}
+
+export function loadPlaybackRate (kind: SpeedKind = 'book'): number {
+	const n = Number(read(speedKey(kind)));
 	return n >= 0.5 && n <= 2 ? n : 1;
 }
 
-export function savePlaybackRate (rate: number): void {
-	write(SPEED_KEY, String(rate));
+export function savePlaybackRate (rate: number, kind: SpeedKind = 'book'): void {
+	write(speedKey(kind), String(rate));
 }
 
 const LIBRARY_KEY = 'voxfolio.libraryId';

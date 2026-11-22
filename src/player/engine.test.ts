@@ -555,3 +555,42 @@ describe('podcast episodes', () => {
 		expect(s.series).toBeNull();
 	});
 });
+
+test('a show opened without an episode plays the episode in progress', async () => {
+	const show = {
+		id: 'show-1', libraryId: 'p', mediaType: 'podcast',
+		media: {coverPath: '/c', metadata: {title: 'Show'}, episodes: [
+			{id: 'new', libraryItemId: 'show-1', title: 'New', publishedAt: 3},
+			{id: 'mid', libraryItemId: 'show-1', title: 'Mid', publishedAt: 2}
+		]}
+	};
+	const c = makeClient({
+		getItem: jest.fn(async () => show),
+		startPlayback: jest.fn(async (_id: string, _d: unknown, _m: unknown, episodeId?: string | null) => {
+			if (!episodeId) throw new Error('needs an episode');
+			return session();
+		}),
+		progressByItem: jest.fn(async () => ({'show-1/mid': {libraryItemId: 'show-1', episodeId: 'mid', currentTime: 50, duration: 100, progress: 0.5, isFinished: false, lastUpdate: 5}}))
+	});
+	const engine = new PlayerEngine(c.client, new FakeAudio() as unknown as HTMLAudioElement, device);
+	await engine.open('show-1');
+	for (let i = 0; i < 5; i++) await flush();
+	expect(engine.getState().episodeId).toBe('mid');
+	expect(engine.getState().status).not.toBe('error');
+});
+
+test('books and podcast episodes keep their own speed', async () => {
+	window.localStorage.clear();
+	const c = makeClient();
+	const audio = new FakeAudio();
+	const engine = new PlayerEngine(c.client, audio as unknown as HTMLAudioElement, device);
+	await engine.open('item-1');
+	engine.setRate(1.25);
+	await engine.open('item-1', true, undefined, 'ep-1');
+	expect(engine.getState().rate).toBe(1);
+	engine.setRate(1.1);
+	await engine.open('item-1');
+	expect(engine.getState().rate).toBe(1.25);
+	await engine.open('item-1', true, undefined, 'ep-1');
+	expect(engine.getState().rate).toBe(1.1);
+});

@@ -169,6 +169,12 @@ export interface SearchResults {
 	narrators: {name: string; numBooks: number}[];
 }
 
+/** A podcast library's search: matching shows, and episodes (each a show item with the match as recentEpisode). */
+export interface PodcastSearchResults {
+	podcast: {libraryItem: LibraryItem}[];
+	episodes: {libraryItem: LibraryItem}[];
+}
+
 /** One of Audiobookshelf's personalised Home shelves. */
 export interface Shelf {
 	id: string;

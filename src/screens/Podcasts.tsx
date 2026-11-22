@@ -51,6 +51,19 @@ export function episodeTile (client: AbsClient, e: PodcastEpisode, progress: Rec
 	};
 }
 
+/** A show's tile: its episode count, or its host when the listing doesn't say (search results). */
+export function showTile (client: AbsClient, s: LibraryItem): GridItem {
+	const count = s.media.numEpisodes || (s.media.episodes ? s.media.episodes.length : 0);
+	return {
+		key: 'show:' + s.id,
+		coverUrl: s.media.coverPath ? client.coverUrl(s.id, 480) : '',
+		title: s.media.metadata.title,
+		author: s.media.metadata.author,
+		subtitle: count ? count + (count === 1 ? ' episode' : ' episodes') : s.media.metadata.author || '',
+		percent: null
+	};
+}
+
 /** ★ Podcasts: what you're partway through, the newest episodes, and every show. */
 export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlayEpisode, onOpenShow}: PodcastsProps) {
 	const [load, setLoad] = useState<Load>(() => {
@@ -137,14 +150,7 @@ export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlay
 						<CoverRow
 							title="Shows"
 							meta={String(data.shows.length)}
-							items={data.shows.map((s) => ({
-								key: 'show:' + s.id,
-								coverUrl: s.media.coverPath ? client.coverUrl(s.id, 480) : '',
-								title: s.media.metadata.title,
-								author: s.media.metadata.author,
-								subtitle: (s.media.numEpisodes || 0) + ((s.media.numEpisodes || 0) === 1 ? ' episode' : ' episodes'),
-								percent: null
-							}))}
+							items={data.shows.map((s) => showTile(client, s))}
 							onSelect={(g) => onOpenShow(g.key.slice(5), g.title, g.key)}
 							defaultFocus={!data.inProgress.length && !data.latest.length}
 						/>

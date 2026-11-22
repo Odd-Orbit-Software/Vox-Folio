@@ -17,8 +17,10 @@ import {nextInSeries} from '../app/series';
 import {podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
 import {getSettings, selectProfileSettings, updateSettings, useSettings} from '../app/settings';
-import type {SeriesEntry} from '../app/series';
+import {findNextEpisode, fromSeries} from '../app/upnext';
+import type {NextUp} from '../app/upnext';
 import {PodcastsContext} from '../components/PodcastsContext';
+import {installMarquee} from '../components/marquee';
 import {ProfileContext} from '../components/ProfileContext';
 import {Screensaver} from '../components/Screensaver';
 import {Toasts} from '../components/Toasts';
@@ -169,8 +171,9 @@ const startProfile = activeProfile(profileState) || (profileState.profiles.lengt
 selectProfileSettings(startProfile ? startProfile.id : null);
 
 interface UpNext {
-	forItemId: string;
-	next: SeriesEntry | null;
+	/** progressKey of what's loaded. */
+	forKey: string;
+	next: NextUp | null;
 }
 
 function App () {
@@ -392,20 +395,32 @@ function App () {
 		});
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// What comes next in the series for the book that's loaded (the Up Next card and autoplay).
+	// What comes next for what's loaded (the Up Next card and autoplay): the next book in the series,
+	// or a podcast's next episode.
 	useEffect(() => {
 		const itemId = player.itemId;
+		const episodeId = player.episodeId;
 		const series = player.series;
 		const libraryId = player.libraryId;
-		if (!client || !itemId || !series || !libraryId) return undefined;
+		if (!client || !itemId) return undefined;
+		const forKey = progressKey(itemId, episodeId);
 		let cancelled = false;
-		client.seriesBooks(libraryId, series.id).then((books) => {
-			if (!cancelled) setUpNext({forItemId: itemId, next: nextInSeries(books, itemId, series.id, series.name)});
+		const found = episodeId
+			? findNextEpisode(client, itemId, episodeId)
+			: series && libraryId
+				? client.seriesBooks(libraryId, series.id).then((books) => {
+					const next = nextInSeries(books, itemId, series.id, series.name);
+					return next ? fromSeries(next) : null;
+				})
+				: null;
+		if (!found) return undefined;
+		found.then((next) => {
+			if (!cancelled) setUpNext({forKey, next});
 		}, () => undefined);
 		return () => {
 			cancelled = true;
 		};
-	}, [client, player.itemId, player.series, player.libraryId]);
+	}, [client, player.itemId, player.episodeId, player.series, player.libraryId]);
 
 	// Bookmarks in the book that's loaded (stored on the server, so other apps see them too).
 	const [bookmarks, setBookmarks] = useState<{itemId: string; list: Bookmark[]} | null>(null);
@@ -450,10 +465,10 @@ function App () {
 	const playNext = useCallback(() => {
 		const {session: current, upNext: un} = live.current;
 		if (!current || !un || !un.next) return;
-		const finishedId = un.forItemId;
-		current.client.setFinished(finishedId, true).catch(() => undefined);
-		pushToast('Up next: ' + un.next.item.media.metadata.title);
-		openBook(current.engine, un.next.item.id);
+		const [finishedId, finishedEpisode] = un.forKey.split('/');
+		current.client.setFinished(finishedId, true, finishedEpisode || null).catch(() => undefined);
+		pushToast('Up next: ' + un.next.title);
+		openBook(current.engine, un.next.key);
 	}, [openBook, pushToast]);
 
 	// Engine events: notices become toasts, the end of a book is saved as finished and (with autoplay)
@@ -470,8 +485,9 @@ function App () {
 				report({kind: 'audio', status: s.status, muted: audio.muted, volume: audio.volume, paused: audio.paused, readyState: audio.readyState, networkState: audio.networkState, rate: audio.playbackRate, inDocument: document.body.contains(audio), mediaError: audio.error ? audio.error.code : null, mediaId: (audio as unknown as {mediaId?: string}).mediaId || null});
 				if (s.status === 'ended' && was !== 'ended' && s.itemId) {
 					const {session: current, autoplay: on, upNext: un, declined: no} = live.current;
-					const hasNext = Boolean(un && un.forItemId === s.itemId && un.next);
-					if (on && hasNext && no.indexOf(s.itemId) === -1) {
+					const key = progressKey(s.itemId, s.episodeId);
+					const hasNext = Boolean(un && un.forKey === key && un.next);
+					if (on && hasNext && no.indexOf(key) === -1) {
 						playNext();
 					} else if (current) {
 						current.client.setFinished(s.itemId, true, s.episodeId).catch(() => undefined);
@@ -503,6 +519,7 @@ function App () {
 	// Save the position when the TV hides the app (Home button, input switch, power off).
 	useEffect(() => {
 		refreshClockFormat();
+		const removeMarquee = installMarquee();
 		const onVisibility = () => {
 			if (!document.hidden) {
 				idle.wake();
@@ -516,7 +533,10 @@ function App () {
 			else current.client.ensureFresh().then(() => current.engine.catchUp());
 		};
 		document.addEventListener('visibilitychange', onVisibility);
-		return () => document.removeEventListener('visibilitychange', onVisibility);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			removeMarquee();
+		};
 	}, []);
 
 	// The TV asks before starting its own screensaver. While we're showing, say no and put up ours;
@@ -592,7 +612,8 @@ function App () {
 		if (player.itemId === itemId && player.episodeId === episodeId && player.status !== 'error') showPlayer(fromKey);
 		else openBook(engine, progressKey(itemId, episodeId), {fromKey});
 	};
-	const nextForPlayer = upNext && upNext.forItemId === player.itemId && upNext.next && autoplay && player.itemId && declined.indexOf(player.itemId) === -1 ? upNext.next : null;
+	const playerKey = player.itemId ? progressKey(player.itemId, player.episodeId) : null;
+	const nextForPlayer = upNext && playerKey && upNext.forKey === playerKey && upNext.next && autoplay && declined.indexOf(playerKey) === -1 ? upNext.next : null;
 
 	const profileInfo = currentProfile ? {
 		name: displayName(currentProfile),
@@ -635,6 +656,8 @@ function App () {
 						else openBook(engine, itemId, {fromKey});
 					}}
 					onDetails={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+					onPlayEpisode={openEpisode}
+					onOpenShow={(itemId, title, fromKey) => go({name: 'podcast', itemId, title}, fromKey)}
 					onShowPlayer={(fromKey) => showPlayer(fromKey)}
 					onTab={onTab}
 					onSettings={onSettings}
@@ -660,6 +683,8 @@ function App () {
 					onOpenSeries={(libraryId, seriesId, seriesName, fromKey) => go({name: 'seriesDetail', libraryId, seriesId, seriesName}, fromKey)}
 					onOpenAuthor={(authorId, authorName, fromKey) => go({name: 'author', authorId, authorName}, fromKey)}
 					onOpenNarrator={(libraryId, name, fromKey) => go({name: 'books', title: name, source: {kind: 'narrator', libraryId, name}}, fromKey)}
+					onOpenShow={(itemId, title, fromKey) => go({name: 'podcast', itemId, title}, fromKey)}
+					onPlayEpisode={openEpisode}
 				/>
 			)}
 			{route.name === 'podcasts' && client && engine && (
@@ -763,11 +788,11 @@ function App () {
 					player={player}
 					autoplay={autoplay}
 					next={nextForPlayer}
-					nextCoverUrl={nextForPlayer && nextForPlayer.item.media.coverPath ? client.coverUrl(nextForPlayer.item.id, 520) : ''}
+					nextCoverUrl={nextForPlayer && nextForPlayer.hasCover ? client.coverUrl(nextForPlayer.itemId, 520) : ''}
 					onToggleAutoplay={toggleAutoplay}
 					onPlayNext={playNext}
 					onDeclineNext={() => {
-						if (player.itemId) setDeclined((d) => d.concat(player.itemId as string));
+						if (playerKey) setDeclined((d) => d.concat(playerKey));
 					}}
 					onHome={() => setStack(reset({name: 'home'}))}
 					onRetry={() => player.itemId && openBook(engine, progressKey(player.itemId, player.episodeId))}
