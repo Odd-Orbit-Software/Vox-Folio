@@ -3011,3 +3011,48 @@
 .vf-filter__value.is-current .vf-chapter__title {
 	color: var(--vf-brass);
 }
+
+/* ---- playlist ---------------------------------------------------------------------------------- */
+
+.vf-list__actions {
+	width: 100%;
+	margin-top: 22px;
+	align-items: center;
+}
+
+.vf-list__note {
+	margin-left: 28px;
+	font-size: 22px;
+}
+
+.vf-list--playlist .vf-grid {
+	top: 330px;
+}
+
+.vf-player__queue > svg {
+	margin-right: 10px;
+}
+
+/* In a playlist, OK on an entry plays it: the focused cover says so with a play mark. */
+.vf-list--playlist .vf-book:focus .vf-grid__cover::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 88px;
+	height: 88px;
+	margin: -44px 0 0 -44px;
+	border-radius: 44px;
+	background: rgba(15, 17, 21, 0.72) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23F3EEE6' d='M8 5v14l11-7z'/%3E%3C/svg%3E") center / 44px no-repeat;
+}
+
+.vf-list__playlabel {
+	max-width: 760px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.vf-player__queue {
+	color: var(--vf-brass);
+}

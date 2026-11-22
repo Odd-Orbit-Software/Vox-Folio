@@ -18,6 +18,8 @@ interface PlayerProps {
 	engine: PlayerEngine;
 	player: PlayerState;
 	autoplay: boolean;
+	/** "Weekend queue · 2 of 5" while playing a playlist in order, else null. */
+	queueLabel: string | null;
 	/** The next book in the series (or a podcast's next episode) when autoplay will play it, else null. */
 	next: NextUp | null;
 	nextCoverUrl: string;
@@ -236,7 +238,7 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 }
 
 function UpNextCard ({next, coverUrl, seconds, onPlay, onDecline}: {next: NextUp; coverUrl: string; seconds: number; onPlay: () => void; onDecline: () => void}) {
-	const label = next.episodeId ? next.date : next.sequence ? bookLabel(next.sequence) : '';
+	const label = next.label || (next.episodeId ? next.date : next.sequence ? bookLabel(next.sequence) : '');
 	return (
 		<>
 			<div className="vf-scrim vf-scrim--light" />
@@ -308,7 +310,7 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, autoplay, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
+export default function Player ({engine, player, autoplay, queueLabel, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
 	const [panel, setPanel] = useState<Panel>('none');
 	const speedOpen = panel === 'speed';
 	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
@@ -409,7 +411,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 
 	const loading = p.status === 'loading' && !p.title;
 	/** Something can follow this item: a series book or a podcast episode. */
-	const hasNext = Boolean(p.series || p.episodeId);
+	const hasNext = Boolean(p.series || p.episodeId || queueLabel);
 
 	return (
 		<ScreenContainer key="player" id="player" className={'vf-player' + (panel !== 'none' ? ' has-panel' : '')}>
@@ -417,6 +419,7 @@ export default function Player ({engine, player, autoplay, next, nextCoverUrl, o
 				<span className="vf-hint"><Icon name="chevronDown" size={24} />Back to browsing</span>
 				<Clock className="vf-player__time" />
 				<span className="vf-player__status">
+					{queueLabel && <span className="vf-hint vf-player__queue"><Icon name="queue" size={24} />{queueLabel}</span>}
 					<span className="vf-hint">
 						{p.sync === 'synced' ? <Icon name="cloud" size={24} /> : <Icon name="cloudOff" size={24} />}
 						{syncLabel(p, now)}

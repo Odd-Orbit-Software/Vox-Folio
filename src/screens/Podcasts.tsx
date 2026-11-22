@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
-import type {LibraryItem, MediaProgress, PodcastEpisode} from '../abs/types';
+import type {LibraryItem, MediaProgress, Playlist, PodcastEpisode} from '../abs/types';
 import {episodeLength, episodeState, episodeTileDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
 import type {Route} from '../app/routes';
 import type {GridItem} from '../components/CoverGrid';
@@ -17,12 +17,14 @@ interface PodcastsProps {
 	onSettings: () => void;
 	onPlayEpisode: (itemId: string, episodeId: string, fromKey: string) => void;
 	onOpenShow: (itemId: string, title: string, fromKey: string) => void;
+	onOpenPlaylist: (id: string, name: string, fromKey: string) => void;
 }
 
 interface Data {
 	inProgress: PodcastEpisode[];
 	latest: PodcastEpisode[];
 	shows: LibraryItem[];
+	playlists: Playlist[];
 	progress: Record<string, MediaProgress>;
 }
 
@@ -64,8 +66,23 @@ export function showTile (client: AbsClient, s: LibraryItem): GridItem {
 	};
 }
 
+/** A playlist's tile: the first entry's cover and how many it holds. */
+export function playlistTile (client: AbsClient, pl: Playlist): GridItem {
+	const items = pl.items || [];
+	const first = items[0];
+	const episodes = items.filter((i) => i.episodeId).length;
+	const noun = episodes === items.length ? (items.length === 1 ? ' episode' : ' episodes') : (items.length === 1 ? ' item' : ' items');
+	return {
+		key: 'playlist:' + pl.id,
+		coverUrl: first ? client.coverUrl(first.libraryItemId, 480) : '',
+		title: pl.name,
+		subtitle: 'Playlist · ' + items.length + noun,
+		percent: null
+	};
+}
+
 /** ★ Podcasts: what you're partway through, the newest episodes, and every show. */
-export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlayEpisode, onOpenShow}: PodcastsProps) {
+export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlayEpisode, onOpenShow, onOpenPlaylist}: PodcastsProps) {
 	const [load, setLoad] = useState<Load>(() => {
 		const saved = cache.get(client);
 		return saved ? {state: 'ready', data: saved} : {state: 'loading'};
@@ -83,12 +100,13 @@ export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlay
 				client.shelves(libraryId),
 				client.recentEpisodes(libraryId, 24),
 				client.libraryItems(libraryId, {sort: 'media.metadata.title', page: 0, limit: 200}),
-				client.progressByItem()
-			]).then(([shelves, latest, shows, progress]) => {
+				client.progressByItem(),
+				client.playlists(libraryId).catch(() => [] as Playlist[])
+			]).then(([shelves, latest, shows, progress, playlists]) => {
 				if (cancelled) return;
 				const going = shelves.find((s) => s.id === 'continue-listening');
 				const inProgress = (going ? going.entities : []).map((i) => i.recentEpisode).filter((e): e is PodcastEpisode => Boolean(e));
-				const data = {inProgress, latest, shows: shows.results, progress};
+				const data = {inProgress, latest, shows: shows.results, playlists, progress};
 				cache.set(client, data);
 				setLoad({state: 'ready', data});
 			});
@@ -153,6 +171,13 @@ export default function Podcasts ({client, restoreKey, onTab, onSettings, onPlay
 							items={data.shows.map((s) => showTile(client, s))}
 							onSelect={(g) => onOpenShow(g.key.slice(5), g.title, g.key)}
 							defaultFocus={!data.inProgress.length && !data.latest.length}
+						/>
+					)}
+					{data.playlists.length > 0 && (
+						<CoverRow
+							title="Playlists"
+							items={data.playlists.map((pl) => playlistTile(client, pl))}
+							onSelect={(g) => onOpenPlaylist(g.key.slice(9), g.title, g.key)}
 						/>
 					)}
 					{!data.shows.length && <p className="vf-message__body" data-vrow>No shows in this library yet.</p>}

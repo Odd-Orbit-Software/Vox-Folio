@@ -19,7 +19,7 @@ Step through TV keys one at a time and log focus. Don't send long blind key sequ
 | --- | --- | --- | --- |
 | A | Autoplay toggle in the player; mark an episode played/unplayed; remove from Continue Listening | 0.3.1 | done (committed on `features`) |
 | B | Library filters (progress, genre, tag, narrator, language) | 0.4.0 | done (committed on `features`) |
-| C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | todo |
+| C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | done (committed on `features`) |
 | D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | todo |
 | E | Live progress from the server (socket) | 0.7.0 | todo |
 | F | Year in Review | 0.8.0 | todo |
@@ -82,6 +82,35 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
 - Playlist items are `{libraryItemId, episodeId?, libraryItem, episode?}`.
 - Playlist page: a Play button, then items in order. Up Next follows the playlist after the current item.
 - Notes:
+  - Built:
+    - `src/app/queue.ts` (+ test): `queueFromPlaylist`, `nextInQueue` (skips finished items), `queueStart`.
+    - App has `queue` state and `playQueue`. `openBook` clears the queue unless `keepQueue` is set, so playing anything by hand leaves the playlist.
+    - The Up Next effect checks the queue first, before the series or episode.
+    - `NextUp.label` holds "Weekend queue · 2 of 3".
+    - The player top bar shows the queue label, and the Autoplay chip appears for queued items too.
+  - `BookList.tsx` handles playlists:
+    - A "Play all" (or "Continue playlist") button.
+    - Numbered tiles keyed `q:<key>`; OK on a tile plays from there.
+    - Episodes are included.
+  - The Podcasts tab has a Playlists row (playlists from the podcast library).
+  - Test data on claude-test-2: "Weekend queue" (book library: Tales from the Folly, The Martian, Project Hail Mary) and "Commute" (podcast library: Sword and Scale Ep 377, then BtB Part Two).
+  - TV-tested:
+    - Folly's progress was set to 17380/17410 and Play all pressed. The Up Next card read "Weekend queue · 2 of 3". Folly was marked finished and The Martian started as 2 of 3.
+    - Stopped by a cold relaunch. The Martian is at 36 s on claude-test-2.
+  - UX review (impeccable; the detector came back clean). Fixes applied:
+    - The queue is saved to localStorage under `voxfolio.queue.v1` with its userId, and restored per account.
+    - Playing one of the queue's own entries by hand keeps the queue. Anything else leaves it with a "Left X" toast.
+    - "End of X" toast at the end of the queue.
+    - When every entry is finished, the button reads "Play again from the start" (`replay`, which ignores finished). Otherwise it reads "Continue · <title>".
+    - Tile badges come from the queue index.
+    - A play mark on the focused playlist tile.
+    - Brass queue label in the player.
+    - Episode tiles drop the repeated show name.
+    - TV-verified: the playlist page, and restart then Home Resume keeping "Weekend queue · 2 of 3".
+  - Left for later:
+    - A queue sheet in the player (see upcoming, stop after this one, leave).
+    - Details from a playlist tile.
+    - A cover mosaic for playlist tiles.
 
 ## D. Home shelves and settings
 

@@ -170,6 +170,7 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 		case 'podcast': return <svg {...common}><g {...stroke}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" /></g></svg>;
 		case 'bookmark': return <svg {...common}><path {...stroke} d="M6 3h12v18l-6-4-6 4z" /></svg>;
 		case 'close': return <svg {...common}><path {...stroke} d="M6 6l12 12M18 6L6 18" /></svg>;
+		case 'queue': return <svg {...common}><path {...stroke} d="M4 6h12M4 11h12M4 16h7M16 14v6l5-3z" /></svg>;
 		case 'filter': return <svg {...common}><path {...stroke} d="M4 5h16l-6 7.5V19l-4-2v-4.5z" /></svg>;
 		case 'search': return <svg {...common}><g {...stroke}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></g></svg>;
 		case 'authors': return <svg {...common}><g {...stroke}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></g></svg>;
@@ -198,4 +199,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'filter' | 'podcast' | 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'queue' | 'filter' | 'podcast' | 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

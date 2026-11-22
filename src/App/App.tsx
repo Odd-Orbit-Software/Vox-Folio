@@ -38,6 +38,8 @@ import AuthorScreen from '../screens/Author';
 import Authors from '../screens/Authors';
 import BookList from '../screens/BookList';
 import Collections from '../screens/Collections';
+import {loadQueue, nextInQueue, queueIndex, saveQueue} from '../app/queue';
+import type {Queue} from '../app/queue';
 import Details from '../screens/Details';
 import Home from '../screens/Home';
 import Library from '../screens/Library';
@@ -188,6 +190,12 @@ function App () {
 	const [upNext, setUpNext] = useState<UpNext | null>(null);
 	// Books whose Up Next the listener turned down ("Not now"), so autoplay skips them.
 	const [declined, setDeclined] = useState<string[]>([]);
+	// The playlist being played in order, if any (Up Next and autoplay follow it).
+	const [queue, setQueue] = useState<Queue | null>(null);
+	const queueRef = useRef<Queue | null>(null);
+	useEffect(() => {
+		queueRef.current = queue;
+	}, [queue]);
 	const toastId = useRef(0);
 
 	const client = session ? session.client : null;
@@ -298,7 +306,14 @@ function App () {
 	}, []);
 
 	/** Open a book, or a podcast episode when `key` is "<show>/<episode>" (see progressKey). */
-	const openBook = useCallback((target: PlayerEngine, key: string, opts: {fromKey?: string | null; startAt?: number} = {}) => {
+	const openBook = useCallback((target: PlayerEngine, key: string, opts: {fromKey?: string | null; startAt?: number; keepQueue?: boolean} = {}) => {
+		// Playing something from outside the playlist leaves it; one of its own entries keeps it.
+		const q = queueRef.current;
+		if (!opts.keepQueue && q && queueIndex(q, key) === -1) {
+			setQueue(null);
+			saveQueue(null);
+			pushToast('Left ' + q.name);
+		}
 		const previous = target.getState();
 		if (previous.itemId && progressKey(previous.itemId, previous.episodeId) !== key && previous.title) {
 			pushToast('Saved your place in ' + previous.title);
@@ -405,7 +420,10 @@ function App () {
 		if (!client || !itemId) return undefined;
 		const forKey = progressKey(itemId, episodeId);
 		let cancelled = false;
-		const found = episodeId
+		const inQueue = queue && queueIndex(queue, forKey) !== -1 ? queue : null;
+		const found = inQueue
+			? client.progressByItem().catch(() => ({})).then((p) => nextInQueue(inQueue, forKey, p))
+			: episodeId
 			? findNextEpisode(client, itemId, episodeId)
 			: series && libraryId
 				? client.seriesBooks(libraryId, series.id).then((books) => {
@@ -420,7 +438,7 @@ function App () {
 		return () => {
 			cancelled = true;
 		};
-	}, [client, player.itemId, player.episodeId, player.series, player.libraryId]);
+	}, [client, player.itemId, player.episodeId, player.series, player.libraryId, queue]);
 
 	// Bookmarks in the book that's loaded (stored on the server, so other apps see them too).
 	const [bookmarks, setBookmarks] = useState<{itemId: string; list: Bookmark[]} | null>(null);
@@ -468,7 +486,7 @@ function App () {
 		const [finishedId, finishedEpisode] = un.forKey.split('/');
 		current.client.setFinished(finishedId, true, finishedEpisode || null).catch(() => undefined);
 		pushToast('Up next: ' + un.next.title);
-		openBook(current.engine, un.next.key);
+		openBook(current.engine, un.next.key, {keepQueue: true});
 	}, [openBook, pushToast]);
 
 	// Engine events: notices become toasts, the end of a book is saved as finished and (with autoplay)
@@ -491,7 +509,15 @@ function App () {
 						playNext();
 					} else if (current) {
 						current.client.setFinished(s.itemId, true, s.episodeId).catch(() => undefined);
-						pushToast('Finished ' + s.title);
+						const q = queueRef.current;
+						const at = queueIndex(q, key);
+						if (q && at === q.entries.length - 1) {
+							pushToast('End of ' + q.name);
+							setQueue(null);
+							saveQueue(null);
+						} else {
+							pushToast('Finished ' + s.title);
+						}
 					}
 				}
 			}
@@ -509,6 +535,30 @@ function App () {
 			}
 		});
 	}, [engine, pushToast, signOut, playNext]);
+
+	/** Play a playlist in order from one of its entries. */
+	const playQueue = useCallback((q: Queue, startKey: string, fromKey?: string | null) => {
+		const current = live.current.session;
+		if (!current) return;
+		openBook(current.engine, startKey, {fromKey, keepQueue: true});
+		setQueue({...q, userId: current.client.credentials.userId});
+	}, [openBook]);
+
+	// The playlist survives a relaunch (for the same account).
+	useEffect(() => {
+		if (queue) saveQueue(queue);
+	}, [queue]);
+	useEffect(() => {
+		if (!client) return undefined;
+		let cancelled = false;
+		// After this render: picking up the saved queue isn't urgent.
+		Promise.resolve().then(() => {
+			if (!cancelled) setQueue(loadQueue(client.credentials.userId));
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [client]);
 
 	const toggleAutoplay = useCallback(() => {
 		const on = !getSettings().seriesAutoplay;
@@ -613,6 +663,8 @@ function App () {
 		else openBook(engine, progressKey(itemId, episodeId), {fromKey});
 	};
 	const playerKey = player.itemId ? progressKey(player.itemId, player.episodeId) : null;
+	const queueAt = queueIndex(queue, playerKey);
+	const queueLabel = queue && queueAt !== -1 ? queue.name + ' · ' + (queueAt + 1) + ' of ' + queue.entries.length : null;
 	const nextForPlayer = upNext && playerKey && upNext.forKey === playerKey && upNext.next && autoplay && declined.indexOf(playerKey) === -1 ? upNext.next : null;
 
 	const profileInfo = currentProfile ? {
@@ -696,6 +748,7 @@ function App () {
 					onSettings={onSettings}
 					onPlayEpisode={openEpisode}
 					onOpenShow={(itemId, title, fromKey) => go({name: 'podcast', itemId, title}, fromKey)}
+					onOpenPlaylist={(id, name, fromKey) => go({name: 'books', title: name, source: {kind: 'playlist', id}}, fromKey)}
 				/>
 			)}
 			{route.name === 'podcast' && client && engine && (
@@ -745,6 +798,7 @@ function App () {
 					source={route.source}
 					restoreKey={top.focusKey}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
+					onPlayQueue={playQueue}
 				/>
 			)}
 			{route.name === 'series' && client && (
@@ -789,6 +843,7 @@ function App () {
 					engine={engine}
 					player={player}
 					autoplay={autoplay}
+					queueLabel={queueLabel}
 					next={nextForPlayer}
 					nextCoverUrl={nextForPlayer && nextForPlayer.hasCover ? client.coverUrl(nextForPlayer.itemId, 520) : ''}
 					onToggleAutoplay={toggleAutoplay}

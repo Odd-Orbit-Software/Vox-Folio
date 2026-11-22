@@ -3,6 +3,14 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.5.0
+
+**Playlists play in order**
+- A playlist's page has Play all (or Continue from where you are, or Play again from the start once all of it is finished). OK on any entry plays from there.
+- Up Next and autoplay follow the playlist, skipping what you've finished. The player shows "Weekend queue · 2 of 3", and the end of the playlist is announced.
+- The playlist is remembered across restarts. Playing one of its entries from Home keeps it going. Playing something else leaves it, and says so.
+- Podcast playlists appear on the Podcasts tab.
+
 ## 0.4.0
 
 **Library filters**

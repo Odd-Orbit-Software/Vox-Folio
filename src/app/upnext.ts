@@ -19,6 +19,8 @@ export interface NextUp {
 	/** Episodes: when it was published, "19 Nov 2026". */
 	date: string;
 	hasCover: boolean;
+	/** Overrides the Up Next eyebrow, e.g. "Weekend queue · 2 of 3" in a playlist. */
+	label?: string;
 }
 
 export function fromSeries (e: SeriesEntry): NextUp {

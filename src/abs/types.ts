@@ -197,7 +197,9 @@ export interface Collection {
 export interface Playlist {
 	id: string;
 	name: string;
-	items?: {libraryItemId: string; libraryItem?: LibraryItem}[];
+	libraryId?: string;
+	/** In order. A podcast library's playlists hold episodes (episodeId and episode set). */
+	items?: {libraryItemId: string; episodeId?: string | null; libraryItem?: LibraryItem; episode?: PodcastEpisode}[];
 }
 
 export interface Bookmark {
