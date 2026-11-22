@@ -25,6 +25,9 @@ interface PlayerProps {
 	onQueuePick: (key: string) => void;
 	onStopAfter: () => void;
 	onLeaveQueue: () => void;
+	/** Just left this playlist: its name, offered back for a little while. */
+	rejoin: string | null;
+	onRejoin: () => void;
 	/** The next book in the series (or a podcast's next episode) when autoplay will play it, else null. */
 	next: NextUp | null;
 	nextCoverUrl: string;
@@ -390,7 +393,7 @@ function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}
 	);
 }
 
-export default function Player ({engine, player, autoplay, queueLabel, queue, onQueuePick, onStopAfter, onLeaveQueue, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
+export default function Player ({engine, player, autoplay, queueLabel, queue, onQueuePick, onStopAfter, onLeaveQueue, rejoin, onRejoin, next, nextCoverUrl, onToggleAutoplay, onPlayNext, onDeclineNext, onHome, onRetry, skipBack, skipForward, sleepDefault, bookmarks, onAddBookmark, onRemoveBookmark}: PlayerProps) {
 	const [panel, setPanel] = useState<Panel>('none');
 	const speedOpen = panel === 'speed';
 	const remainingReal = player.duration ? Math.max(0, player.duration - player.position) / (player.rate || 1) : Infinity;
@@ -437,6 +440,12 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 		if (hadJump.current && !player.remoteJump && (!active || active === document.body)) focusWithin('player', 'play');
 		hadJump.current = Boolean(player.remoteJump);
 	}, [player.remoteJump]);
+
+	// Likewise when "Rejoin playlist" expires.
+	useEffect(() => {
+		const active = document.activeElement as HTMLElement | null;
+		if (!rejoin && (!active || active === document.body)) focusWithin('player', 'play');
+	}, [rejoin]);
 
 	// When Up Next goes away (declined, or the next book started), return focus to the controls.
 	const upNextWas = useRef(false);
@@ -593,9 +602,16 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 								<Icon name="autoplay" size={24} />{autoplay ? 'Autoplay on' : 'Autoplay off'}
 							</Button>
 						)}
-						{queue && (
-							<Button variant="chip" className="vf-queuechip" data-focus-key="queue" aria-label={'Playlist ' + queue.name + ', ' + (queue.at + 1) + ' of ' + queue.entries.length + '. OK to see it'} onClick={() => setPanel('queue')}>
-								<Icon name="queue" size={24} />{(queue.at + 1) + ' of ' + queue.entries.length}
+						{/* One chip for both states, so focus stays on it when Rejoin turns back into "2 of 3". */}
+						{(queue || rejoin) && (
+							<Button
+								variant="chip"
+								className="vf-queuechip"
+								data-focus-key="queue"
+								aria-label={queue ? 'Playlist ' + queue.name + ', ' + (queue.at + 1) + ' of ' + queue.entries.length + '. OK to see it' : 'Rejoin ' + rejoin}
+								onClick={() => (queue ? setPanel('queue') : onRejoin())}
+							>
+								{queue ? <><Icon name="queue" size={24} />{(queue.at + 1) + ' of ' + queue.entries.length}</> : <><Icon name="undo" size={24} />Rejoin playlist</>}
 							</Button>
 						)}
 					</div>
@@ -661,6 +677,8 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 					onLeave={() => {
 						setPanel('none');
 						onLeaveQueue();
+						// Land on Play, not on the Rejoin chip, so an extra OK doesn't undo the leave.
+						window.setTimeout(() => focusWithin('player', 'play'), 0);
 					}}
 				/>
 			)}

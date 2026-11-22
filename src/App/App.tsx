@@ -202,6 +202,13 @@ function App () {
 	const [declined, setDeclined] = useState<string[]>([]);
 	// The playlist being played in order, if any (Up Next and autoplay follow it).
 	const [queue, setQueue] = useState<Queue | null>(null);
+	// Just left with "Leave playlist": offered back for half a minute ("Rejoin").
+	const [leftQueue, setLeftQueue] = useState<Queue | null>(null);
+	useEffect(() => {
+		if (!leftQueue) return undefined;
+		const t = window.setTimeout(() => setLeftQueue(null), 60000);
+		return () => window.clearTimeout(t);
+	}, [leftQueue]);
 	const queueRef = useRef<Queue | null>(null);
 	useEffect(() => {
 		queueRef.current = queue;
@@ -939,8 +946,16 @@ function App () {
 					onLeaveQueue={() => {
 						if (!queue) return;
 						pushToast('Left ' + queue.name);
+						setLeftQueue(queue);
 						setQueue(null);
 						saveQueue(null);
+					}}
+					rejoin={leftQueue && queueIndex(leftQueue, playerKey) !== -1 ? leftQueue.name : null}
+					onRejoin={() => {
+						if (!leftQueue) return;
+						setQueue(leftQueue);
+						setLeftQueue(null);
+						pushToast('Rejoined ' + leftQueue.name);
 					}}
 					next={nextForPlayer}
 					nextCoverUrl={nextForPlayer && nextForPlayer.hasCover ? client.coverUrl(nextForPlayer.itemId, 520) : ''}
