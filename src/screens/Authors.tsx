@@ -3,10 +3,10 @@ import {useEffect, useState} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import type {Author} from '../abs/types';
 import type {Route} from '../app/routes';
-import {Button} from '../components/controls';
 import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
 import {Rail} from '../components/Rail';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {resolveLibraryId} from './Library';
 
@@ -80,19 +80,16 @@ export default function Authors ({client, restoreKey, onTab, onSettings, onOpenA
 				</div>
 			</header>
 			{error ? (
-				<div className="vf-browse__message">
-					<p className="vf-message__body">{error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setError(null);
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={error} onRetry={() => {
+					setError(null);
+					setReload((n) => n + 1);
+				}}
+				/>
 			) : (
 				<CoverGrid
 					items={items}
+					loading={!loaded}
+					round
 					initialRow={loaded ? loaded.row : 0}
 					onRowChange={setCacheRow}
 					onSelect={(g) => onOpenAuthor(g.key.slice(7), g.title, g.key)}

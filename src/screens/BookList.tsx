@@ -3,8 +3,9 @@ import {useEffect, useState} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import type {LibraryItem, MediaProgress} from '../abs/types';
 import type {BookSource} from '../app/routes';
-import {Button, Icon} from '../components/controls';
+import {Icon} from '../components/controls';
 import {CoverGrid} from '../components/CoverGrid';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {toGridItem} from './Library';
 
@@ -54,18 +55,13 @@ export default function BookList ({client, title, source, restoreKey, onOpenTitl
 				{books && <span className="vf-muted vf-browse__count">{books.length + (books.length === 1 ? ' book' : ' books')}</span>}
 			</header>
 			{error ? (
-				<div className="vf-list__message">
-					<p className="vf-message__body">{error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setError(null);
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={error} onRetry={() => {
+					setError(null);
+					setReload((n) => n + 1);
+				}}
+				/>
 			) : (
-				<CoverGrid items={(books || []).map((b) => toGridItem(client, b, progress[b.id]))} onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)} />
+				<CoverGrid items={(books || []).map((b) => toGridItem(client, b, progress[b.id]))} loading={books === null} onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)} />
 			)}
 		</ScreenContainer>
 	);

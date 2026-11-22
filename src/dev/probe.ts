@@ -87,6 +87,31 @@ export function installErrorReporter (params: LaunchParams): void {
 	send(target, {app: 'vox-folio', kind: 'hello', userAgent: navigator.userAgent, innerWidth: window.innerWidth, innerHeight: window.innerHeight, dpr: window.devicePixelRatio, screen: [window.screen.width, window.screen.height], rootTransform: (document.getElementById('root') || document.body).style.transform});
 }
 
+/** Counts animation frames until stopped. Development only (the `perf` launch param). */
+function startFrameMeter (): () => {fps: number; worstFrameMs: number; stutters: number; seconds: number} {
+	let frames = 0;
+	let worst = 0;
+	let stutters = 0;
+	let last = performance.now();
+	const start = last;
+	let running = true;
+	const tick = (t: number) => {
+		if (!running) return;
+		const dt = t - last;
+		last = t;
+		frames += 1;
+		if (dt > worst) worst = dt;
+		if (dt > 50) stutters += 1;
+		window.requestAnimationFrame(tick);
+	};
+	window.requestAnimationFrame(tick);
+	return () => {
+		running = false;
+		const seconds = (performance.now() - start) / 1000;
+		return {fps: Math.round(frames / seconds), worstFrameMs: Math.round(worst), stutters, seconds: Math.round(seconds)};
+	};
+}
+
 const KEY_NAMES: Record<string, number> = {
 	up: 38, down: 40, left: 37, right: 39, ok: 13, back: 461,
 	play: 415, pause: 19, stop: 413, ff: 417, rw: 412, chup: 33, chdown: 34,
@@ -107,9 +132,12 @@ function press (code: number): void {
 export function replayKeys (params: LaunchParams, onDone?: () => void): void {
 	if (typeof params.probe !== 'string' || typeof params.keys !== 'string') return;
 	const steps = params.keys.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);
+	// With `perf`, measure frames while the keys play: fps, worst frame and stutters (frames > 50 ms).
+	const meter = params.perf ? startFrameMeter() : null;
 	let i = 0;
 	const next = () => {
 		if (i >= steps.length) {
+			if (meter) report({kind: 'perf', during: params.keys, ...meter()});
 			if (onDone) onDone();
 			return;
 		}

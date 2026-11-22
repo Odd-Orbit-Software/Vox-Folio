@@ -135,11 +135,13 @@ function tintFor (title: string): string {
 /** Book cover, falling back to a typographic placeholder when there's no image or it fails to load. */
 export function Cover ({url, title, author, size, className = '', round}: CoverProps) {
 	const [failed, setFailed] = useState(false);
+	const [loaded, setLoaded] = useState(false);
 	const style = {width: size + 'px', height: size + 'px'};
 	if (url && !failed) {
+		// Fades in once loaded rather than popping in line by line.
 		return (
 			<div className={'vf-cover ' + className} style={style}>
-				<img src={url} alt="" onError={() => setFailed(true)} />
+				<img src={url} alt="" className={loaded ? 'is-loaded' : ''} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
 			</div>
 		);
 	}

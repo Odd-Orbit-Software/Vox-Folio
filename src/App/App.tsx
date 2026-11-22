@@ -25,6 +25,7 @@ import {devLogin, installErrorReporter, replayKeys, report, runProbe} from '../d
 import {idlePlayerState, PlayerEngine} from '../player/engine';
 import {formatClock} from '../player/timeline';
 import type {PlayerState} from '../player/engine';
+import {refreshClockFormat} from '../platform/clockFormat';
 import {controlTvScreensaver} from '../platform/screensaver';
 import {activate, exitApp, isBackKey, Keys, onRelaunch, readLaunchParams, requestedItemId} from '../platform/webos';
 import About from '../screens/About';
@@ -139,6 +140,7 @@ function clientFor (profile: Profile): AbsClient {
 
 function makeSession (profile: Profile): Session {
 	const client = clientFor(profile);
+	client.keepFresh();
 	return {profileId: profile.id, client, engine: new PlayerEngine(client, audio, device)};
 }
 
@@ -222,7 +224,8 @@ function App () {
 	// The engine shares the one <audio> element; detach the old one when the account changes.
 	useEffect(() => () => {
 		if (engine) engine.dispose();
-	}, [engine]);
+		if (client) client.stopKeepingFresh();
+	}, [engine, client]);
 
 	// Latest values for event handlers that are registered once.
 	const live = useRef({session, route, stackDepth: stack.length, autoplay, upNext, declined});
@@ -479,14 +482,18 @@ function App () {
 
 	// Save the position when the TV hides the app (Home button, input switch, power off).
 	useEffect(() => {
+		refreshClockFormat();
 		const onVisibility = () => {
-			if (!document.hidden) idle.wake();
+			if (!document.hidden) {
+				idle.wake();
+				refreshClockFormat();
+			}
 			const current = live.current.session;
 			if (!current) return;
 			// Hidden (Home button, input switch, standby): close the session so the listening is
 			// recorded. Coming back, show a newer place from another device; Play opens a new session.
 			if (document.hidden) current.engine.suspend(true);
-			else current.engine.catchUp();
+			else current.client.ensureFresh().then(() => current.engine.catchUp());
 		};
 		document.addEventListener('visibilitychange', onVisibility);
 		return () => document.removeEventListener('visibilitychange', onVisibility);

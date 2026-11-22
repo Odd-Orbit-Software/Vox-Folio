@@ -5,8 +5,8 @@ import type {Series} from '../abs/types';
 import type {Route} from '../app/routes';
 import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
-import {Button} from '../components/controls';
 import {Rail} from '../components/Rail';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {resolveLibraryId} from './Library';
 
@@ -96,17 +96,11 @@ export default function SeriesList ({client, restoreKey, onTab, onSettings, onOp
 				</div>
 			</header>
 			{error ? (
-				<div className="vf-browse__message">
-					<h2 className="vf-message__title">Can&apos;t load your series</h2>
-					<p className="vf-message__body">{error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setError(null);
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={error} onRetry={() => {
+					setError(null);
+					setReload((n) => n + 1);
+				}}
+				/>
 			) : loaded && items.length ? (
 				<CoverGrid
 					items={items}
@@ -120,10 +114,10 @@ export default function SeriesList ({client, restoreKey, onTab, onSettings, onOp
 						if (s) onOpenSeries(loaded.libraryId, s, g.key);
 					}}
 				/>
+			) : loaded && loaded.total === 0 ? (
+				<p className="vf-message__body vf-browse__message">No series in this library yet.</p>
 			) : (
-				<div className="vf-grid" aria-busy="true">
-					{loaded && loaded.total === 0 ? <p className="vf-message__body">No series in this library yet.</p> : null}
-				</div>
+				<CoverGrid items={[]} loading onSelect={() => undefined} />
 			)}
 		</ScreenContainer>
 	);

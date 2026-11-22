@@ -5,6 +5,7 @@ import type {LibraryItem, MediaProgress, SeriesRef} from '../abs/types';
 import {bookLabel, nextInSeries} from '../app/series';
 import type {SeriesEntry} from '../app/series';
 import {Button, Cover, Icon, Tile} from '../components/controls';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import type {PlayerState} from '../player/engine';
 import {formatClock, formatDuration} from '../player/timeline';
@@ -67,18 +68,11 @@ export default function Details ({client, itemId, player, autoplay, restoreKey, 
 	if (load.state === 'error') {
 		return (
 			<ScreenContainer key="error" id="details-error" className="vf-error">
-				<Icon name="alert" size={72} />
-				<h1 className="vf-message__title">{load.error.kind === 'notFound' ? "We couldn't find that book" : "Can't load this book"}</h1>
-				<p className="vf-message__body">{load.error.message}</p>
-				<div className="vf-row vf-row--spaced">
-					<Button variant="primary" data-default-focus onClick={() => {
-						setLoad({state: 'loading'});
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={load.error} onRetry={() => {
+					setLoad({state: 'loading'});
+					setReload((n) => n + 1);
+				}}
+				/>
 			</ScreenContainer>
 		);
 	}

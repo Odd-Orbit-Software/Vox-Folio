@@ -78,7 +78,8 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out;
+	/* Transform only: animating box-shadow repaints every frame. */
+	transition: transform 140ms ease-out;
 	color: var(--vf-paper);
 }
 
@@ -563,7 +564,7 @@
 .vf-tile {
 	outline: none;
 	border-radius: 14px;
-	transition: transform 140ms ease-out, box-shadow 140ms ease-out;
+	transition: transform 140ms ease-out;
 	transform-origin: center top;
 }
 
@@ -574,11 +575,33 @@
 
 .vf-book:focus {
 	box-shadow: none;
+}
+
+/* Zoom just the cover, on its own GPU layer, so a focus move doesn't repaint the tile and its text. */
+.vf-book .vf-grid__cover {
+	transform-origin: center top;
+	transition: transform 140ms ease-out;
+	will-change: transform;
+}
+
+.vf-book:focus .vf-grid__cover {
 	transform: scale(1.08);
 }
 
+/* The text moves down by the cover's growth (240 px × 0.08) so the zoomed cover never covers it. */
+.vf-book .vf-book__title,
+.vf-book .vf-book__meta {
+	transition: transform 140ms ease-out;
+}
+
+.vf-book:focus .vf-book__title,
+.vf-book:focus .vf-book__meta {
+	transform: translateY(20px);
+}
+
 .vf-book:focus .vf-cover {
-	box-shadow: 0 0 0 5px var(--vf-ground), 0 0 0 9px var(--vf-brass), 0 20px 50px rgba(0, 0, 0, 0.5);
+	/* Ring only: a large blurred drop shadow costs dropped frames on TV GPUs on every focus move. */
+	box-shadow: 0 0 0 5px var(--vf-ground), 0 0 0 9px var(--vf-brass);
 }
 
 .vf-book__title {
@@ -1336,6 +1359,7 @@
 }
 
 .vf-grid__rows {
+	will-change: transform;
 	display: grid;
 	grid-template-columns: repeat(6, 240px);
 	grid-column-gap: 32px;
@@ -2107,6 +2131,7 @@
 }
 
 .vf-vscroll__inner {
+	will-change: transform;
 	transition: transform 220ms ease-out;
 }
 
@@ -2135,6 +2160,7 @@
 }
 
 .vf-crow__track {
+	will-change: transform;
 	display: flex;
 	transition: transform 220ms ease-out;
 }
@@ -2651,4 +2677,74 @@
 	margin: 18px 0 0;
 	font-size: 20px;
 	color: var(--vf-faint);
+}
+
+/* ---- errors ------------------------------------------------------------------------------------ */
+
+.vf-errorpanel {
+	margin-top: 120px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.vf-errorpanel__title {
+	margin: 0 0 32px;
+	font: 500 56px/1.1 'Newsreader', serif;
+}
+
+.vf-errorpanel--home {
+	margin-top: 160px;
+}
+
+.vf-list .vf-errorpanel,
+.vf-author .vf-errorpanel,
+.vf-series .vf-errorpanel {
+	margin-top: 60px;
+}
+
+.vf-error .vf-errorpanel {
+	margin-top: 0;
+}
+
+.vf-offline {
+	background: rgba(240, 160, 138, 0.14);
+	color: #F3C9BC;
+	font-weight: 500;
+}
+
+/* ---- loading -------------------------------------------------------------------------------- */
+
+.vf-cover img {
+	opacity: 0;
+	transition: opacity 240ms ease-out;
+}
+
+.vf-cover img.is-loaded {
+	opacity: 1;
+}
+
+.vf-grid__tile--skeleton {
+	width: 240px;
+}
+
+.vf-skeleton--tile {
+	width: 240px;
+	height: 240px;
+}
+
+.vf-skeleton--round {
+	border-radius: 50%;
+}
+
+.vf-skeleton--text {
+	width: 200px;
+	height: 22px;
+	margin-top: 16px;
+	border-radius: 6px;
+}
+
+.vf-skeleton--short {
+	width: 130px;
+	margin-top: 10px;
 }

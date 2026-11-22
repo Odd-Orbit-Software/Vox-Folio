@@ -1,6 +1,6 @@
 {
   "id": "software.oddorbit.voxfolio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "vendor": "Odd Orbit Software Group",
   "type": "web",
   "main": "index.html",
@@ -11,5 +11,9 @@
   "iconColor": "#0F1115",
   "resolution": "1920x1080",
   "handlesRelaunch": true,
-  "disableBackHistoryAPI": true
+  "disableBackHistoryAPI": true,
+  "accessibility": {
+    "supportsAudioGuidance": true
+  },
+  "splashBackground": "splash.png"
 }

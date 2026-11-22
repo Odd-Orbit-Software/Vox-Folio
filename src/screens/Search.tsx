@@ -8,6 +8,7 @@ import {Button, TextField} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
 import {Rail} from '../components/Rail';
 import {CoverRow, VScroll} from '../components/Rows';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {resolveLibraryId, toGridItem} from './Library';
 
@@ -49,6 +50,7 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 	const [found, setFound] = useState<Found | null>(last.found);
 	const [progress, setProgress] = useState<Record<string, MediaProgress>>({});
 	const [error, setError] = useState<AbsError | null>(null);
+	const [retries, setRetries] = useState(0);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -83,7 +85,7 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 			cancelled = true;
 			window.clearTimeout(timer);
 		};
-	}, [client, query]);
+	}, [client, query, retries]);
 
 	const onChange = (value: string) => {
 		setQuery(value);
@@ -136,7 +138,7 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 			</div>
 
 			<VScroll className="vf-search__results">
-				{error && <p className="vf-message__body" data-vrow>{error.message}</p>}
+				{error && <ErrorPanel error={error} onRetry={() => setRetries((n) => n + 1)} />}
 				{q.length > 0 && q.length < MIN_CHARS && <p className="vf-search__hint" data-vrow>Keep typing…</p>}
 				{nothing && <p className="vf-search__hint" data-vrow>{'Nothing matches “' + showing!.query + '”.'}</p>}
 				{books.length > 0 && <CoverRow title="Books" meta={String(books.length)} items={books} onSelect={(g) => onOpenTitle(g.key.slice(5), g.key)} />}

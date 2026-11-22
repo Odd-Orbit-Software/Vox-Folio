@@ -3,9 +3,10 @@ import {useEffect, useState} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import type {Collection, LibraryItem, Playlist} from '../abs/types';
 import type {BookSource} from '../app/routes';
-import {Button, Icon} from '../components/controls';
+import {Icon} from '../components/controls';
 import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 
 interface CollectionsProps {
@@ -57,17 +58,13 @@ export default function Collections ({client, libraryId, restoreKey, onOpen}: Co
 				<h1 className="vf-list__title">Collections &amp; playlists</h1>
 			</header>
 			{error && (
-				<div className="vf-list__message">
-					<p className="vf-message__body">{error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setError(null);
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={error} onRetry={() => {
+					setError(null);
+					setReload((n) => n + 1);
+				}}
+				/>
 			)}
+			{!data && !error && <CoverGrid items={[]} loading onSelect={() => undefined} />}
 			{data && !items.length && <p className="vf-message__body vf-list__message">No collections or playlists yet.</p>}
 			{items.length > 0 && (
 				<CoverGrid

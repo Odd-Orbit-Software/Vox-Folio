@@ -1,4 +1,4 @@
-import {AbsClient, AbsError, normaliseServerUrl} from './client';
+import {AbsClient, AbsError, normaliseServerUrl, tokenExpiry} from './client';
 import type {Credentials} from './client';
 
 const creds: Credentials = {serverUrl: 'https://abs.test', userId: 'u', username: 'me', accessToken: 'a1', refreshToken: 'r1'};
@@ -113,5 +113,30 @@ describe('AbsClient', () => {
 		expect(JSON.parse(body)).toEqual({currentTime: 120, timeListened: 15, duration: 3000});
 		await client.closeSession('s', {currentTime: 125, timeListened: 5, duration: 3000});
 		expect(JSON.parse(body).timeListened).toBe(5);
+	});
+
+	it('reads the expiry from an access token', () => {
+		const payload = window.btoa(JSON.stringify({exp: 2000000000})).replace(/=+$/, '');
+		expect(tokenExpiry('h.' + payload + '.s')).toBe(2000000000 * 1000);
+		expect(tokenExpiry('not-a-jwt')).toBeNull();
+	});
+
+	it('refreshes five minutes before the token expires when kept fresh', async () => {
+		jest.useFakeTimers({now: 1_000_000_000_000});
+		const exp = Math.floor((1_000_000_000_000 + 60 * 60 * 1000) / 1000);
+		const access = 'h.' + window.btoa(JSON.stringify({exp})).replace(/=+$/, '') + '.s';
+		let refreshes = 0;
+		global.fetch = jest.fn(() => {
+			refreshes += 1;
+			return reply(200, JSON.stringify({user: {accessToken: access, refreshToken: 'r2'}}));
+		}) as unknown as typeof fetch;
+		const client = new AbsClient({...creds, accessToken: access}, () => undefined);
+		client.keepFresh();
+		jest.advanceTimersByTime(54 * 60 * 1000);
+		expect(refreshes).toBe(0);
+		jest.advanceTimersByTime(2 * 60 * 1000);
+		expect(refreshes).toBe(1);
+		client.stopKeepingFresh();
+		jest.useRealTimers();
 	});
 });

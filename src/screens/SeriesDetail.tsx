@@ -4,7 +4,8 @@ import {AbsClient, AbsError} from '../abs/client';
 import type {MediaProgress} from '../abs/types';
 import {orderSeries} from '../app/series';
 import type {SeriesEntry} from '../app/series';
-import {Button, Cover, Icon, Tile} from '../components/controls';
+import {Cover, Icon, Tile} from '../components/controls';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {pinScroll, ScreenContainer} from '../components/ScreenContainer';
 import {formatDuration} from '../player/timeline';
 
@@ -66,16 +67,11 @@ export default function SeriesDetail ({client, libraryId, seriesId, seriesName, 
 			</header>
 
 			{load.state === 'error' && (
-				<div className="vf-series__message">
-					<p className="vf-message__body">{load.error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setLoad({state: 'loading'});
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={load.error} onRetry={() => {
+					setLoad({state: 'loading'});
+					setReload((n) => n + 1);
+				}}
+				/>
 			)}
 
 			<div className="vf-series__viewport" onScroll={pinScroll}>

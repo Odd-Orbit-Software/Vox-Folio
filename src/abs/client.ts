@@ -95,10 +95,29 @@ export async function login (serverUrl: string, username: string, password: stri
 	};
 }
 
+/** Expiry (ms since epoch) from a JWT's payload, or null if it can't be read. */
+export function tokenExpiry (token: string): number | null {
+	try {
+		const part = token.split('.')[1];
+		if (!part) return null;
+		const json = window.atob(part.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((part.length + 3) % 4));
+		const exp = (JSON.parse(json) as {exp?: number}).exp;
+		return typeof exp === 'number' ? exp * 1000 : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Refresh this long before the access token expires. */
+const REFRESH_AHEAD_MS = 5 * 60 * 1000;
+const REFRESH_RETRY_MS = 60 * 1000;
+
 export class AbsClient {
 	private creds: Credentials;
 	private readonly onTokens: (creds: Credentials) => void;
 	private refreshing: Promise<void> | null = null;
+	private freshTimer: number | null = null;
+	private keepingFresh = false;
 
 	constructor (creds: Credentials, onTokens: (creds: Credentials) => void) {
 		this.creds = creds;
@@ -107,6 +126,39 @@ export class AbsClient {
 
 	get credentials (): Credentials {
 		return this.creds;
+	}
+
+	/** Keep the access token valid ahead of time. Cover and audio URLs carry it, and an expired one
+	    shows as missing covers until some other request happens to refresh it. Active session only. */
+	keepFresh (): void {
+		this.keepingFresh = true;
+		this.scheduleRefresh();
+	}
+
+	stopKeepingFresh (): void {
+		this.keepingFresh = false;
+		if (this.freshTimer !== null) {
+			window.clearTimeout(this.freshTimer);
+			this.freshTimer = null;
+		}
+	}
+
+	/** Refresh now if the token is close to expiry (after the TV wakes from standby, timers lag). */
+	ensureFresh (): Promise<void> {
+		const exp = tokenExpiry(this.creds.accessToken);
+		if (exp !== null && exp - Date.now() > REFRESH_AHEAD_MS) return Promise.resolve();
+		return this.refresh().catch(() => undefined);
+	}
+
+	private scheduleRefresh (delay?: number): void {
+		if (!this.keepingFresh) return;
+		if (this.freshTimer !== null) window.clearTimeout(this.freshTimer);
+		const exp = tokenExpiry(this.creds.accessToken);
+		const wait = delay !== undefined ? delay : exp === null ? 50 * 60 * 1000 : Math.max(30 * 1000, exp - Date.now() - REFRESH_AHEAD_MS);
+		this.freshTimer = window.setTimeout(() => {
+			this.freshTimer = null;
+			this.refresh().catch(() => this.scheduleRefresh(REFRESH_RETRY_MS));
+		}, wait);
 	}
 
 	/** Exchange the refresh token for a new pair. Concurrent callers share one request. */
@@ -126,6 +178,7 @@ export class AbsClient {
 					refreshToken: data.user.refreshToken || this.creds.refreshToken
 				};
 				this.onTokens(this.creds);
+				this.scheduleRefresh();
 			})();
 			const clear = () => {
 				this.refreshing = null;

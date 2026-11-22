@@ -8,6 +8,7 @@ import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
 import {Button} from '../components/controls';
 import {Rail} from '../components/Rail';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {formatDuration} from '../player/timeline';
 
@@ -203,21 +204,15 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 			</header>
 
 			{error ? (
-				<div className="vf-browse__message">
-					<h2 className="vf-message__title">Can&apos;t load this library</h2>
-					<p className="vf-message__body">{error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setError(null);
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={error} onRetry={() => {
+					setError(null);
+					setReload((n) => n + 1);
+				}}
+				/>
+			) : total === 0 ? (
+				<p className="vf-message__body vf-browse__message">This library has no books yet.</p>
 			) : items.length === 0 ? (
-				<div className="vf-grid vf-grid--skeleton" aria-busy="true">
-					{total === 0 ? <p className="vf-message__body">This library has no books yet.</p> : null}
-				</div>
+				<CoverGrid items={[]} loading onSelect={() => undefined} />
 			) : (
 				<CoverGrid
 						items={grid}

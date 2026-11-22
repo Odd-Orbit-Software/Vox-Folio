@@ -5,6 +5,7 @@ import {perfectCorners} from '../app/corners';
 import {summarise} from '../app/stats';
 import type {StatsSummary} from '../app/stats';
 import {Button, Icon} from '../components/controls';
+import {errorTitle} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {formatDuration} from '../player/timeline';
 
@@ -52,7 +53,7 @@ export default function Stats ({client, onDone}: StatsProps) {
 				<div className="vf-eyebrow">Settings</div>
 				<h1 className="vf-list__title">Listening stats</h1>
 			</header>
-			{error && <p className="vf-message__body">{error.message}</p>}
+			{error && <p className="vf-errorpanel__title">{errorTitle(error)}</p>}
 			{s && (
 				<>
 					<div className="vf-stats__figures">

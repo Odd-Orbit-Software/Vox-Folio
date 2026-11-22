@@ -3,9 +3,10 @@ import {useEffect, useState} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import type {AuthorDetail, MediaProgress} from '../abs/types';
 import {orderSeries} from '../app/series';
-import {Button, Cover, Icon} from '../components/controls';
+import {Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
 import {CoverRow, VScroll} from '../components/Rows';
+import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {toGridItem} from './Library';
 
@@ -72,16 +73,11 @@ export default function Author ({client, authorId, authorName, restoreKey, onOpe
 				</div>
 			</header>
 			{load.state === 'error' && (
-				<div className="vf-author__message">
-					<p className="vf-message__body">{load.error.message}</p>
-					<Button variant="primary" data-default-focus onClick={() => {
-						setLoad({state: 'loading'});
-						setReload((n) => n + 1);
-					}}
-					>
-						Retry
-					</Button>
-				</div>
+				<ErrorPanel error={load.error} onRetry={() => {
+					setLoad({state: 'loading'});
+					setReload((n) => n + 1);
+				}}
+				/>
 			)}
 			<VScroll className="vf-author__rows">
 				{rows.map((r, i) => (

@@ -8,7 +8,9 @@ import {Button, Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
 import {Rail} from '../components/Rail';
 import {CoverRow, VScroll} from '../components/Rows';
+import {ErrorPanel, errorTitle} from '../components/ErrorPanel';
 import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
+import {report} from '../dev/probe';
 import type {PlayerState} from '../player/engine';
 import {formatDuration} from '../player/timeline';
 import {Keys} from '../platform/webos';
@@ -86,11 +88,15 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 		: {state: 'loading'}));
 
 	const [reload, setReload] = useState(0);
+	/** The last refresh failed while saved books are showing. */
+	const [stale, setStale] = useState<AbsError | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 		Promise.all([client.itemsInProgress(12), client.progressByItem()]).then(([items, progress]) => {
 			if (cancelled) return;
+			// Development: time from launch to fresh Home data (no-op without `probe`).
+			report({kind: 'perf', homeFreshMs: Math.round(performance.now()), fromCache: Boolean(cached)});
 			const entries = items.map((item) => ({item, progress: progress[item.id] || null}));
 			setLoad({state: 'ready', entries, progress});
 			// Keep only what Home shows, so the cache stays small.
@@ -100,12 +106,16 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 			});
 			writeCache(client, {entries, progress: shown});
 		}, (e: unknown) => {
-			if (!cancelled) setLoad({state: 'error', error: e instanceof AbsError ? e : new AbsError('server', String(e))});
+			if (cancelled) return;
+			const err = e instanceof AbsError ? e : new AbsError('server', String(e));
+			// With saved books on screen, keep them and just flag that we couldn't refresh.
+			setLoad((prev) => (prev.state === 'ready' ? prev : {state: 'error', error: err}));
+			setStale(err);
 		});
 		return () => {
 			cancelled = true;
 		};
-	}, [client, reload]);
+	}, [client, reload, cached]);
 
 	// The server's shelves are extras: Home works without them.
 	const [shelves, setShelves] = useState<Shelf[]>(() => (cached ? cached.shelves : []));
@@ -122,7 +132,8 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	}, [client, reload]);
 
 	const retry = () => {
-		setLoad({state: 'loading'});
+		setStale(null);
+		setLoad((prev) => (prev.state === 'ready' ? prev : {state: 'loading'}));
 		setReload((n) => n + 1);
 	};
 
@@ -157,6 +168,9 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 			<header className="vf-topbar">
 				<h1 className="vf-browse__h1">Home</h1>
 				<div className="vf-topbar__actions">
+					{stale && load.state === 'ready' && (
+						<Button variant="chip" className="vf-offline" data-focus-key="offline" onClick={retry}>{errorTitle(stale) + ' · Retry'}</Button>
+					)}
 					{nowPlaying && (
 						<Button variant="chip" className="vf-nowplaying" onClick={() => onShowPlayer('now-playing')} onKeyDown={downFromTop} data-focus-key="now-playing">
 							<Icon name={nowPlaying.status === 'playing' ? 'pause' : 'play'} size={18} />
@@ -178,15 +192,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				</div>
 			)}
 
-			{load.state === 'error' && (
-				<div className="vf-message">
-					<h1 className="vf-message__title">Can&apos;t load your books</h1>
-					<p className="vf-message__body">{load.error.message}</p>
-					<div className="vf-row">
-						<Button variant="primary" data-default-focus onClick={retry}>Retry</Button>
-					</div>
-				</div>
-			)}
+			{load.state === 'error' && <ErrorPanel error={load.error} onRetry={retry} className="vf-errorpanel--home" />}
 
 			<div onFocus={rememberRow}>
 			<VScroll className="vf-home__rows">
