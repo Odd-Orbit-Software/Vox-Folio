@@ -68,7 +68,7 @@ export default function Collections ({client, libraryId, restoreKey, onOpen}: Co
 					</Button>
 				</div>
 			)}
-			{data && !items.length && <p className="vf-message__body vf-list__message">No collections or playlists yet. Make them in Audiobookshelf and they&apos;ll appear here.</p>}
+			{data && !items.length && <p className="vf-message__body vf-list__message">No collections or playlists yet.</p>}
 			{items.length > 0 && (
 				<CoverGrid
 					items={items}

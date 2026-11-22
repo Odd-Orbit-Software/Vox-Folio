@@ -37,6 +37,31 @@ export function Rail ({active, onTab, onSettings}: {active: Route['name']; onTab
 	const nav = useRef<HTMLElement>(null);
 	const profile = useProfileInfo();
 
+	// The last thing focused in the screen's content, so Right from the rail returns to it
+	// instead of whatever happens to sit nearest.
+	const lastContent = useRef<HTMLElement | null>(null);
+	useEffect(() => {
+		const onFocusIn = (ev: FocusEvent) => {
+			const el = ev.target as HTMLElement | null;
+			const screen = nav.current && nav.current.parentElement;
+			if (el && screen && screen.contains(el) && !nav.current!.contains(el)) lastContent.current = el;
+		};
+		const onKeyDown = (ev: KeyboardEvent) => {
+			if (ev.keyCode !== Keys.RIGHT || !nav.current || !nav.current.contains(document.activeElement)) return;
+			const back = lastContent.current;
+			if (back && back.isConnected && Spotlight.focus(back as unknown as string)) {
+				ev.preventDefault();
+				ev.stopPropagation();
+			}
+		};
+		document.addEventListener('focusin', onFocusIn);
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => {
+			document.removeEventListener('focusin', onFocusIn);
+			window.removeEventListener('keydown', onKeyDown, true);
+		};
+	}, []);
+
 	useEffect(() => {
 		const onKeyDown = (ev: KeyboardEvent) => {
 			if (ev.keyCode !== Keys.LEFT || !nav.current) return;

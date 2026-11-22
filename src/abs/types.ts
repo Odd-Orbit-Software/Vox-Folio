@@ -97,6 +97,7 @@ export interface MediaProgress {
 	progress: number;
 	isFinished: boolean;
 	lastUpdate: number;
+	finishedAt?: number | null;
 }
 
 export interface PlaybackSession {
@@ -117,8 +118,9 @@ export interface PlaybackSession {
 export interface SyncPayload {
 	/** Book position in seconds, at 1× regardless of playback speed. */
 	currentTime: number;
-	/** Seconds actually spent listening since the previous sync. */
-	timeListening: number;
+	/** Seconds actually spent listening since the previous sync. The server reads this exact field name
+	    (`timeListened`, not its stored total `timeListening`); with any other name it records nothing. */
+	timeListened: number;
 	duration: number;
 }
 
@@ -169,4 +171,11 @@ export interface Bookmark {
 	time: number;
 	title: string;
 	createdAt: number;
+}
+
+export interface ListeningStats {
+	totalTime: number;
+	/** Seconds listened per day, keyed YYYY-MM-DD. */
+	days: Record<string, number>;
+	today: number;
 }

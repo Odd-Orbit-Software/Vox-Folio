@@ -129,7 +129,7 @@ export default function Search ({client, restoreKey, onTab, onSettings, onOpenTi
 					label="SEARCH"
 					value={query}
 					onChange={onChange}
-					placeholder="Press OK to type a title, author, narrator or series"
+					placeholder="Search by title, author, narrator, or series"
 					spotlightId="search-field"
 					defaultFocus={!restoreKey}
 				/>

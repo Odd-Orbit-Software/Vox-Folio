@@ -10,6 +10,7 @@ export type Route =
 	| {name: 'details'; itemId: string}
 	| {name: 'player'}
 	| {name: 'settings'}
+	| {name: 'stats'}
 	| {name: 'search'}
 	| {name: 'authors'}
 	| {name: 'author'; authorId: string; authorName: string}

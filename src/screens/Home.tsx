@@ -1,4 +1,5 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import type {KeyboardEvent} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
 import type {LibraryItem, MediaProgress, Shelf} from '../abs/types';
@@ -7,9 +8,10 @@ import {Button, Cover, Icon} from '../components/controls';
 import type {GridItem} from '../components/CoverGrid';
 import {Rail} from '../components/Rail';
 import {CoverRow, VScroll} from '../components/Rows';
-import {ScreenContainer} from '../components/ScreenContainer';
+import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
 import type {PlayerState} from '../player/engine';
 import {formatDuration} from '../player/timeline';
+import {Keys} from '../platform/webos';
 import {resolveLibraryId, toGridItem} from './Library';
 
 interface HomeProps {
@@ -31,6 +33,36 @@ interface Entry {
 
 type Load = {state: 'loading'} | {state: 'error'; error: AbsError} | {state: 'ready'; entries: Entry[]; progress: Record<string, MediaProgress>};
 
+/* Instant start: the last Home, kept per account (book data only, never tokens), shown at once
+   while the fresh copy loads. */
+interface HomeCache {
+	entries: Entry[];
+	progress: Record<string, MediaProgress>;
+	shelves: Shelf[];
+}
+
+function cacheKey (client: AbsClient): string {
+	return 'voxfolio.home.v1:' + client.credentials.serverUrl + '|' + client.credentials.userId;
+}
+
+function readCache (client: AbsClient): HomeCache | null {
+	try {
+		const raw = window.localStorage.getItem(cacheKey(client));
+		return raw ? JSON.parse(raw) as HomeCache : null;
+	} catch {
+		return null;
+	}
+}
+
+function writeCache (client: AbsClient, patch: Partial<HomeCache>): void {
+	try {
+		const next = {...(readCache(client) || {entries: [], progress: {}, shelves: []}), ...patch};
+		window.localStorage.setItem(cacheKey(client), JSON.stringify(next));
+	} catch {
+		// Storage full: Home just loads normally next time.
+	}
+}
+
 /** Audiobookshelf's own Home shelves we show, in order, with our labels. */
 const SHELVES: {id: string; label: string; prefix: string}[] = [
 	{id: 'continue-series', label: 'Continue series', prefix: 'next'},
@@ -48,14 +80,25 @@ function percent (e: Entry): number {
 }
 
 export default function Home ({client, player, restoreKey, onPlay, onDetails, onShowPlayer, onTab, onSettings}: HomeProps) {
-	const [load, setLoad] = useState<Load>({state: 'loading'});
+	const [cached] = useState(() => readCache(client));
+	const [load, setLoad] = useState<Load>(() => (cached && cached.entries.length
+		? {state: 'ready', entries: cached.entries, progress: cached.progress}
+		: {state: 'loading'}));
 
 	const [reload, setReload] = useState(0);
 
 	useEffect(() => {
 		let cancelled = false;
 		Promise.all([client.itemsInProgress(12), client.progressByItem()]).then(([items, progress]) => {
-			if (!cancelled) setLoad({state: 'ready', entries: items.map((item) => ({item, progress: progress[item.id] || null})), progress});
+			if (cancelled) return;
+			const entries = items.map((item) => ({item, progress: progress[item.id] || null}));
+			setLoad({state: 'ready', entries, progress});
+			// Keep only what Home shows, so the cache stays small.
+			const shown: Record<string, MediaProgress> = {};
+			Object.keys(progress).forEach((k) => {
+				if (progress[k].isFinished === false || items.some((i) => i.id === k)) shown[k] = progress[k];
+			});
+			writeCache(client, {entries, progress: shown});
 		}, (e: unknown) => {
 			if (!cancelled) setLoad({state: 'error', error: e instanceof AbsError ? e : new AbsError('server', String(e))});
 		});
@@ -65,11 +108,13 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	}, [client, reload]);
 
 	// The server's shelves are extras: Home works without them.
-	const [shelves, setShelves] = useState<Shelf[]>([]);
+	const [shelves, setShelves] = useState<Shelf[]>(() => (cached ? cached.shelves : []));
 	useEffect(() => {
 		let cancelled = false;
 		resolveLibraryId(client).then((id) => (id ? client.shelves(id) : [])).then((list) => {
-			if (!cancelled) setShelves(list);
+			if (cancelled) return;
+			setShelves(list);
+			writeCache(client, {shelves: list.filter((sh) => SHELVES.some((d) => d.id === sh.id))});
 		}, () => undefined);
 		return () => {
 			cancelled = true;
@@ -79,6 +124,19 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 	const retry = () => {
 		setLoad({state: 'loading'});
 		setReload((n) => n + 1);
+	};
+
+	// Down from the top bar (the now-playing chip) returns to where you were in the shelves.
+	const lastRowKey = useRef<string | null>(null);
+	const rememberRow = (ev: {target: EventTarget}) => {
+		const key = (ev.target as HTMLElement).getAttribute && (ev.target as HTMLElement).getAttribute('data-focus-key');
+		if (key) lastRowKey.current = key;
+	};
+	const downFromTop = (ev: KeyboardEvent<HTMLElement>) => {
+		if (ev.keyCode !== Keys.DOWN) return;
+		ev.preventDefault();
+		ev.stopPropagation();
+		focusWithin('home', lastRowKey.current);
 	};
 
 	const entries = load.state === 'ready' ? load.entries : [];
@@ -100,7 +158,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				<h1 className="vf-browse__h1">Home</h1>
 				<div className="vf-topbar__actions">
 					{nowPlaying && (
-						<Button variant="chip" className="vf-nowplaying" onClick={() => onShowPlayer('now-playing')} data-focus-key="now-playing">
+						<Button variant="chip" className="vf-nowplaying" onClick={() => onShowPlayer('now-playing')} onKeyDown={downFromTop} data-focus-key="now-playing">
 							<Icon name={nowPlaying.status === 'playing' ? 'pause' : 'play'} size={18} />
 							<span className="vf-nowplaying__title">{nowPlaying.title || 'Loading…'}</span>
 							{nowPlaying.duration > 0 && <span className="vf-muted vf-nowplaying__pct">{'· ' + Math.round(nowPlaying.position / nowPlaying.duration * 100) + '%'}</span>}
@@ -130,11 +188,12 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 				</div>
 			)}
 
+			<div onFocus={rememberRow}>
 			<VScroll className="vf-home__rows">
 				{load.state === 'ready' && !hero && (
 					<div className="vf-message vf-home__empty" data-vrow>
 						<h1 className="vf-message__title">Nothing in progress yet</h1>
-						<p className="vf-message__body">Start a book on your phone, or open one from the Polaris home screen, and it will show up here.</p>
+						<p className="vf-message__body">Books you start will appear here.</p>
 						{nowPlaying && (
 							<div className="vf-row">
 								<Button variant="primary" data-default-focus onClick={() => onShowPlayer('now-playing')}>Back to the player</Button>
@@ -180,6 +239,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && i === 0} onSelect={(g) => onDetails(g.key.slice(r.prefix.length + 1), g.key)} />
 				))}
 			</VScroll>
+			</div>
 		</ScreenContainer>
 	);
 }

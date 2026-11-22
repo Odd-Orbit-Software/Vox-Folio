@@ -3,7 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
-import type {Author, AuthorDetail, Bookmark, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
+import type {Author, AuthorDetail, Bookmark, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
 
@@ -135,9 +135,11 @@ export class AbsClient {
 		return this.refreshing;
 	}
 
-	private async request<T> (method: string, path: string, body?: unknown, what = 'That item'): Promise<T> {
+	private async request<T> (method: string, path: string, body?: unknown, what = 'That item', keepalive = false): Promise<T> {
 		const send = () => http(this.creds.serverUrl + path, {
 			method,
+			// keepalive lets a request finish even if the app is closing (session close on exit).
+			keepalive,
 			headers: {
 				Authorization: 'Bearer ' + this.creds.accessToken,
 				...(body === undefined ? {} : {'Content-Type': 'application/json'})
@@ -296,6 +298,11 @@ export class AbsClient {
 		return this.request<void>('DELETE', '/api/me/item/' + encodeURIComponent(itemId) + '/bookmark/' + time);
 	}
 
+	async listeningStats (): Promise<ListeningStats> {
+		const data = await this.request<ListeningStats>('GET', '/api/me/listening-stats');
+		return {totalTime: data && data.totalTime || 0, days: data && data.days || {}, today: data && data.today || 0};
+	}
+
 	/** Mark a book finished (or not) for this listener. */
 	setFinished (itemId: string, isFinished: boolean): Promise<void> {
 		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId), {isFinished});
@@ -315,7 +322,8 @@ export class AbsClient {
 		return this.request<void>('POST', '/api/session/' + encodeURIComponent(sessionId) + '/sync', payload, 'The listening session');
 	}
 
-	closeSession (sessionId: string, payload?: SyncPayload): Promise<void> {
-		return this.request<void>('POST', '/api/session/' + encodeURIComponent(sessionId) + '/close', payload, 'The listening session');
+	/** Close a session so Audiobookshelf records it as listening history (open ones aren't counted). */
+	closeSession (sessionId: string, payload?: SyncPayload, keepalive = false): Promise<void> {
+		return this.request<void>('POST', '/api/session/' + encodeURIComponent(sessionId) + '/close', payload, 'The listening session', keepalive);
 	}
 }

@@ -1,4 +1,5 @@
 import type {Credentials} from '../abs/client';
+import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
 import {nextChoice, SKIP_CHOICES, SLEEP_CHOICES, sleepLabel, updateSettings, useSettings} from '../app/settings';
 import {Button, Icon, Tile} from '../components/controls';
@@ -12,6 +13,7 @@ interface SettingsProps {
 	onSettings: () => void;
 	onAbout: () => void;
 	onSignOut: () => void;
+	onStats: () => void;
 }
 
 interface RowProps {
@@ -38,8 +40,9 @@ function Row ({id, label, hint, value, onSelect, first}: RowProps) {
 
 const onOff = (on: boolean) => (on ? 'On' : 'Off');
 
-export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut}: SettingsProps) {
+export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats}: SettingsProps) {
 	const s = useSettings();
+	const premium = isPremium();
 
 	return (
 		<ScreenContainer id="settings" className="vf-browse vf-settings" restoreKey={restoreKey}>
@@ -51,11 +54,13 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 			<div className="vf-settings__body">
 				<section className="vf-settings__group" aria-label="Playback">
 					<h2 className="vf-eyebrow">Playback</h2>
-					<Row first id="skipBack" label="Skip back" hint="◀◀ and the back button" value={s.skipBack + ' seconds'} onSelect={() => updateSettings({skipBack: nextChoice(SKIP_CHOICES, s.skipBack)})} />
-					<Row id="skipForward" label="Skip forward" hint="▶▶ and the forward button" value={s.skipForward + ' seconds'} onSelect={() => updateSettings({skipForward: nextChoice(SKIP_CHOICES, s.skipForward)})} />
-					<Row id="smartRewind" label="Smart rewind" hint="Step back a little after a pause, more after longer ones" value={onOff(s.smartRewind)} onSelect={() => updateSettings({smartRewind: !s.smartRewind})} />
-					<Row id="sleepDefault" label="Sleep timer" hint="What Yellow starts in the player" value={sleepLabel(s.sleepDefault)} onSelect={() => updateSettings({sleepDefault: nextChoice(SLEEP_CHOICES, s.sleepDefault)})} />
-					<Row id="autoplay" label="Series autoplay" hint="Start the next book in the series when one ends" value={onOff(s.seriesAutoplay)} onSelect={() => updateSettings({seriesAutoplay: !s.seriesAutoplay})} />
+					<Row first id="skipBack" label="Skip back" hint="How far rewind jumps back" value={s.skipBack + ' seconds'} onSelect={() => updateSettings({skipBack: nextChoice(SKIP_CHOICES, s.skipBack)})} />
+					<Row id="skipForward" label="Skip forward" hint="How far fast-forward jumps ahead" value={s.skipForward + ' seconds'} onSelect={() => updateSettings({skipForward: nextChoice(SKIP_CHOICES, s.skipForward)})} />
+					<Row id="smartRewind" label="Smart rewind" hint="Replay a few seconds when you resume" value={onOff(s.smartRewind)} onSelect={() => updateSettings({smartRewind: !s.smartRewind})} />
+					<Row id="sleepDefault" label="Sleep timer" hint="Default timer for the yellow remote button" value={sleepLabel(s.sleepDefault)} onSelect={() => updateSettings({sleepDefault: nextChoice(SLEEP_CHOICES, s.sleepDefault)})} />
+					<Row id="autoplay" label="Series autoplay" hint="Play the next book in a series when one ends" value={onOff(s.seriesAutoplay)} onSelect={() => updateSettings({seriesAutoplay: !s.seriesAutoplay})} />
+					<Row id="nightMode" label="Screensaver night mode ★" hint="Dimmer and slower from 10pm to 6am" value={premium ? onOff(s.nightMode) : '★ Premium'} onSelect={() => premium && updateSettings({nightMode: !s.nightMode})} />
+					<Row id="stats" label="Listening stats ★" hint="Time listened, streaks, and books finished" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onStats()} />
 				</section>
 
 				<section className="vf-settings__group" aria-label="Account">

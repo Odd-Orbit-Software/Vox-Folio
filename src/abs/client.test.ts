@@ -30,7 +30,7 @@ describe('AbsClient', () => {
 	it('accepts the plain-text OK that session sync returns', async () => {
 		global.fetch = jest.fn(() => reply(200, 'OK', 'text/plain; charset=utf-8')) as unknown as typeof fetch;
 		const client = new AbsClient(creds, () => undefined);
-		await expect(client.syncSession('s', {currentTime: 1, timeListening: 1, duration: 2})).resolves.toBeNull();
+		await expect(client.syncSession('s', {currentTime: 1, timeListened: 1, duration: 2})).resolves.toBeNull();
 	});
 
 	it('refreshes once on 401, saves the rotated tokens and retries', async () => {
@@ -100,5 +100,18 @@ describe('AbsClient', () => {
 		await client.addBookmark('a', 42, 't');
 		await client.removeBookmark('a', 42);
 		expect(calls).toEqual(['POST /api/me/item/a/bookmark {"time":42,"title":"t"}', 'DELETE /api/me/item/a/bookmark/42']);
+	});
+
+	it('sends listening time as timeListened, the field the server records', async () => {
+		let body = '';
+		global.fetch = jest.fn((_url: string, init: RequestInit) => {
+			body = String(init.body);
+			return reply(200, 'OK', 'text/plain');
+		}) as unknown as typeof fetch;
+		const client = new AbsClient(creds, () => undefined);
+		await client.syncSession('s', {currentTime: 120, timeListened: 15, duration: 3000});
+		expect(JSON.parse(body)).toEqual({currentTime: 120, timeListened: 15, duration: 3000});
+		await client.closeSession('s', {currentTime: 125, timeListened: 5, duration: 3000});
+		expect(JSON.parse(body).timeListened).toBe(5);
 	});
 });

@@ -41,10 +41,10 @@ export default function Profiles ({profiles, activeId, onPick, onAdd}: ProfilesP
 				<Tile className="vf-profile vf-profile--add" data-focus-key="profile:add" aria-label="Add someone" onClick={onAdd}>
 					<span className="vf-profile__avatar vf-profile__avatar--add">+</span>
 					<span className="vf-profile__name">Add someone</span>
-					<span className="vf-profile__server">{premium ? 'Their own Audiobookshelf account' : '★ Vox Folio Premium'}</span>
+					<span className="vf-profile__server">{premium ? 'Sign in with another account' : '★ Vox Folio Premium'}</span>
 				</Tile>
 			</div>
-			<p className="vf-profiles__note">Each person keeps their own place in every book, their own Continue Listening and their own settings.</p>
+			<p className="vf-profiles__note">Choose a profile to continue.</p>
 		</ScreenContainer>
 	);
 }

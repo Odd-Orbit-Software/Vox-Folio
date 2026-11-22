@@ -146,7 +146,7 @@ test('pause syncs book position and only the time actually spent playing', async
 	await flush();
 	expect(syncs).toHaveLength(1);
 	expect(syncs[0].currentTime).toBe(104);
-	expect(syncs[0].timeListening).toBe(4);
+	expect(syncs[0].timeListened).toBe(4);
 
 	// A paused minute adds no listening time.
 	jest.setSystemTime(1_000_000 + 64000);
@@ -155,7 +155,7 @@ test('pause syncs book position and only the time actually spent playing', async
 	audio.advance(2);
 	engine.pause();
 	await flush();
-	expect(syncs[1].timeListening).toBe(2);
+	expect(syncs[1].timeListened).toBe(2);
 });
 
 test('playback speed changes position, not listening time', async () => {
@@ -167,7 +167,7 @@ test('playback speed changes position, not listening time', async () => {
 	engine.pause();
 	await flush();
 	expect(syncs[0].currentTime).toBe(110);
-	expect(syncs[0].timeListening).toBe(5);
+	expect(syncs[0].timeListened).toBe(5);
 });
 
 test('syncs periodically while playing', async () => {
@@ -220,7 +220,7 @@ test('seeking while paused saves the new position after a short pause', async ()
 	await flush();
 	expect(syncs).toHaveLength(2);
 	expect(syncs[1].currentTime).toBe(630);
-	expect(syncs[1].timeListening).toBe(0);
+	expect(syncs[1].timeListened).toBe(0);
 });
 
 test('closing flushes the position and closes the session once', async () => {
@@ -228,7 +228,7 @@ test('closing flushes the position and closes the session once', async () => {
 	jest.setSystemTime(1_000_000 + 3000);
 	audio.advance(3);
 	await engine.close();
-	expect(closes).toEqual([{currentTime: 103, timeListening: 3, duration: 1200}]);
+	expect(closes).toEqual([{currentTime: 103, timeListened: 3, duration: 1200}]);
 	expect(syncs).toHaveLength(0);
 });
 
@@ -277,7 +277,7 @@ test('after an outage, our position is written when nobody else moved the book',
 	engine.pause();
 	await flush();
 	expect(c.syncs[0].currentTime).toBe(105);
-	expect(c.syncs[0].timeListening).toBe(5);
+	expect(c.syncs[0].timeListened).toBe(5);
 });
 
 test('a book with no audio files reports an error and closes its session', async () => {
@@ -453,4 +453,80 @@ test('a sync asked for while another is in flight still happens, with the latest
 	await flush();
 	expect(syncs).toHaveLength(2);
 	expect(syncs[1].currentTime).toBe(103);
+});
+
+describe('closing sessions so listening is recorded', () => {
+	test('suspend closes the session with the listening time but keeps the book loaded', async () => {
+		const {audio, engine, closes, raw} = await openEngine();
+		for (let i = 1; i <= 8; i++) {
+			jest.setSystemTime(1_000_000 + i * 1000);
+			audio.advance(1);
+		}
+		await engine.suspend();
+		expect(closes).toEqual([{currentTime: 108, timeListened: 8, duration: 1200}]);
+		expect(audio.paused).toBe(true);
+		expect(engine.getState().status).toBe('paused');
+		expect(engine.getState().itemId).toBe('item-1');
+		expect(raw.startPlayback).toHaveBeenCalledTimes(1);
+	});
+
+	test('Play after a suspend opens a fresh session at our place', async () => {
+		const {audio, engine, raw} = await openEngine();
+		audio.advance(8);
+		await engine.suspend();
+		engine.play();
+		await flush();
+		expect(raw.startPlayback).toHaveBeenCalledTimes(2);
+		expect(engine.getState().position).toBe(108);
+		expect(audio.paused).toBe(false);
+	});
+
+	test('seeking while suspended is kept when playback resumes', async () => {
+		const {engine} = await openEngine();
+		await engine.suspend();
+		engine.seek(700);
+		engine.play();
+		await flush();
+		expect(engine.getState().position).toBe(700);
+	});
+
+	test('a newer position from another device wins on resume', async () => {
+		const c = makeClient();
+		const {engine} = await openEngine(c);
+		await engine.suspend();
+		(c.raw.getProgress as jest.Mock).mockImplementation(async () => ({libraryItemId: 'item-1', currentTime: 900, duration: 1200, progress: 0.75, isFinished: false, lastUpdate: 1_000_000 + 60000}));
+		jest.setSystemTime(1_000_000 + 120000);
+		engine.play();
+		await flush();
+		expect(engine.getState().position).toBe(900);
+	});
+
+	test('a long pause closes the session on its own', async () => {
+		const {engine, closes} = await openEngine();
+		engine.pause();
+		await flush();
+		expect(closes).toHaveLength(0);
+		jest.advanceTimersByTime(10 * 60 * 1000);
+		await flush();
+		expect(closes).toHaveLength(1);
+	});
+
+	test('playing again before then keeps the same session', async () => {
+		const {engine, closes} = await openEngine();
+		engine.pause();
+		jest.advanceTimersByTime(60 * 1000);
+		engine.play();
+		jest.advanceTimersByTime(20 * 60 * 1000);
+		await flush();
+		expect(closes).toHaveLength(0);
+	});
+
+	test('finishing the book closes the session', async () => {
+		const c = makeClient({startPlayback: jest.fn(async () => session(1150))});
+		const {audio, closes} = await openEngine(c);
+		audio.end(); // first file ends → second loads
+		audio.end(); // last file ends
+		await flush();
+		expect(closes).toHaveLength(1);
+	});
 });

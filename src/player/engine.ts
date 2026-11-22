@@ -63,6 +63,8 @@ export interface PlayerState {
 }
 
 const SYNC_INTERVAL_MS = 15000;
+/** A book paused this long gets its session closed, so the listening is recorded as history. */
+const PAUSE_CLOSE_MS = 10 * 60 * 1000;
 const MAX_TICK_S = 5;
 /** Server ahead of us by more than this after a reconnect means another device listened meanwhile. */
 const ADVANCED_THRESHOLD_S = 5;
@@ -118,6 +120,9 @@ export class PlayerEngine {
 	private seekSyncTimer: number | null = null;
 	private readonly rateCtl: PlayRateController;
 	private noticeId = 0;
+	/** Session closed but the book still loaded (paused a while, app hidden): Play opens a new one. */
+	private suspendedAt: number | null = null;
+	private pauseCloseTimer: number | null = null;
 	/** When playback was last paused, for smart rewind. */
 	private pausedAt: number | null = null;
 	private sleepTick: number | null = null;
@@ -244,9 +249,82 @@ export class PlayerEngine {
 		}
 	}
 
+	/** Close the listening session (recording it as history) but keep the book loaded, so Play picks up
+	    where it left off with a fresh session. Used when the app is hidden or exits, after a long pause,
+	    and at the end of a book. `keepalive` lets the request finish while the app is shutting down. */
+	async suspend (keepalive = false): Promise<void> {
+		const session = this.session;
+		this.clearPauseClose();
+		if (!session) return;
+		this.stopSyncTimer();
+		this.accumulate();
+		const payload = this.payload();
+		this.session = null;
+		this.listened = 0;
+		this.lastTick = null;
+		this.suspendedAt = Date.now();
+		if (!this.audio.paused) {
+			this.pausedAt = Date.now();
+			this.audio.pause();
+		}
+		if (this.state.status === 'playing' || this.state.status === 'loading') this.set({status: 'paused'});
+		try {
+			await this.client.closeSession(session.id, payload, keepalive);
+		} catch {
+			// Offline: the server's last sync stands, and it closes stale sessions itself.
+		}
+	}
+
+	/** Play after a suspend: open a new session at our place (or a newer one from another device). */
+	private async resume (): Promise<void> {
+		const itemId = this.state.itemId;
+		const since = this.suspendedAt;
+		if (!itemId || since === null) return;
+		const token = ++this.openToken;
+		this.set({status: 'loading'});
+		try {
+			const [session, progress] = await Promise.all([
+				this.client.startPlayback(itemId, this.device, supportedMimeTypes(this.audio)),
+				this.client.getProgress(itemId).catch(() => null)
+			]);
+			if (token !== this.openToken) {
+				this.client.closeSession(session.id).catch(() => undefined);
+				return;
+			}
+			let position = this.state.position;
+			const newer = progress && progress.lastUpdate > since + 1000 && Math.abs(progress.currentTime - position) > ADVANCED_THRESHOLD_S;
+			if (newer && progress) {
+				position = progress.currentTime;
+				this.notify('Picked up from another device at ' + formatClock(position));
+			}
+			if (this.smartRewind && this.pausedAt !== null) {
+				position = rewindWithinChapter(this.state.chapters, position, smartRewindSeconds(Date.now() - this.pausedAt));
+			}
+			this.session = session;
+			this.tracks = (session.audioTracks || []).slice().sort((a, b) => a.startOffset - b.startOffset);
+			this.suspendedAt = null;
+			this.pausedAt = null;
+			this.lastSyncOk = Date.now();
+			this.set({position, chapterIndex: chapterIndexAt(this.state.chapters, position)});
+			this.loadAt(position, true);
+		} catch (e) {
+			if (token !== this.openToken) return;
+			this.set({status: 'error', error: e instanceof AbsError ? e : new AbsError('server', String(e))});
+		}
+	}
+
+	private clearPauseClose (): void {
+		if (this.pauseCloseTimer !== null) {
+			window.clearTimeout(this.pauseCloseTimer);
+			this.pauseCloseTimer = null;
+		}
+	}
+
 	/** Flush the latest position and close the session. Safe to call at any time. */
 	async close (): Promise<void> {
 		const session = this.session;
+		this.clearPauseClose();
+		this.suspendedAt = null;
 		this.stopSyncTimer();
 		this.accumulate();
 		const payload = this.payload();
@@ -270,7 +348,10 @@ export class PlayerEngine {
 	// ---- transport --------------------------------------------------------------------------------
 
 	play (): void {
-		if (!this.session) return;
+		if (!this.session) {
+			if (this.suspendedAt !== null && this.tracks.length) this.resume();
+			return;
+		}
 		if (this.state.status === 'ended') {
 			this.seek(0);
 		} else if (this.smartRewind && this.pausedAt !== null) {
@@ -366,7 +447,8 @@ export class PlayerEngine {
 	}
 
 	seek (bookTime: number): void {
-		if (!this.session) return;
+		// Seeking works while suspended too; the new spot is used when playback resumes.
+		if (!this.tracks.length) return;
 		const t = clamp(bookTime, 0, Math.max(0, this.state.duration - 0.5));
 		const target = locate(this.tracks, t);
 		this.set({position: t, chapterIndex: chapterIndexAt(this.state.chapters, t), status: this.state.status === 'ended' ? 'paused' : this.state.status});
@@ -410,6 +492,20 @@ export class PlayerEngine {
 	    Called when the book is requested again or the app comes back to the foreground. */
 	async catchUp (): Promise<void> {
 		const session = this.session;
+		if (!session && this.suspendedAt !== null && this.state.itemId) {
+			// Suspended: show a newer position from another device straight away.
+			try {
+				const progress = await this.client.getProgress(this.state.itemId);
+				if (progress && progress.lastUpdate > this.suspendedAt + 1000 && Math.abs(progress.currentTime - this.state.position) > ADVANCED_THRESHOLD_S) {
+					this.seek(progress.currentTime);
+					this.suspendedAt = Date.now();
+					this.notify('Picked up from another device at ' + formatClock(progress.currentTime));
+				}
+			} catch {
+				// Offline: keep our position.
+			}
+			return;
+		}
 		if (!session || !this.audio.paused || this.syncing) return;
 		try {
 			await this.adoptNewerServerPosition(session.libraryItemId, false);
@@ -474,8 +570,8 @@ export class PlayerEngine {
 			return;
 		}
 		this.set({status: 'ended', position: this.state.duration});
-		this.stopSyncTimer();
-		this.sync();
+		// The book is done: close the session so it's recorded.
+		this.suspend();
 	};
 
 	// ---- progress and listening time ----------------------------------------------------------------
@@ -500,6 +596,7 @@ export class PlayerEngine {
 		this.lastTick = Date.now();
 		this.sleepTick = Date.now();
 		this.pausedAt = null;
+		this.clearPauseClose();
 		this.set({status: 'playing'});
 		this.startSyncTimer();
 	};
@@ -513,6 +610,9 @@ export class PlayerEngine {
 		if (this.session) this.set({status: 'paused', sleep: this.state.sleep ? {...this.state.sleep, endsAt: null} : null});
 		this.stopSyncTimer();
 		this.sync();
+		// A long pause closes the session so it's recorded; Play opens a new one.
+		this.clearPauseClose();
+		if (this.session) this.pauseCloseTimer = window.setTimeout(() => this.suspend(), PAUSE_CLOSE_MS);
 	};
 
 	private accumulate (): void {
@@ -530,7 +630,7 @@ export class PlayerEngine {
 	private payload () {
 		return {
 			currentTime: this.state.position,
-			timeListening: Math.round(this.listened),
+			timeListened: Math.round(this.listened),
 			duration: this.state.duration
 		};
 	}
@@ -566,7 +666,7 @@ export class PlayerEngine {
 			if (this.wasOffline && await this.adoptNewerServerPosition(session.libraryItemId, true)) return;
 			const payload = this.payload();
 			await this.client.syncSession(session.id, payload);
-			this.listened = Math.max(0, this.listened - payload.timeListening);
+			this.listened = Math.max(0, this.listened - payload.timeListened);
 			this.lastSyncOk = Date.now();
 			this.wasOffline = false;
 			this.set({sync: 'synced', lastSyncedAt: this.lastSyncOk, unsyncedSeconds: Math.round(this.listened), syncError: null});

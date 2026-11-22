@@ -15,6 +15,8 @@ export interface Settings {
 	/** What the sleep timer panel offers first (and Yellow's quick start). */
 	sleepDefault: SleepDefault;
 	seriesAutoplay: boolean;
+	/** ★ Dim the screensaver and slow its drift late at night. */
+	nightMode: boolean;
 }
 
 export const SKIP_CHOICES = [10, 15, 30, 45, 60];
@@ -33,7 +35,8 @@ const defaults: Settings = {
 	skipForward: 30,
 	smartRewind: true,
 	sleepDefault: 30,
-	seriesAutoplay: true
+	seriesAutoplay: true,
+	nightMode: true
 };
 
 function load (): Settings {

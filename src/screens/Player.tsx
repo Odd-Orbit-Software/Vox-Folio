@@ -69,7 +69,7 @@ function SleepPanel ({sleep, preferred, onPick}: {sleep: SleepState | null; pref
 						</Button>
 					))}
 				</div>
-				<p className="vf-panel__note">The audio fades out gently, and &ldquo;Still listening?&rdquo; appears first. Press any key then to keep going.</p>
+				<p className="vf-panel__note">Fades out at the end. Press any key at &ldquo;Still listening?&rdquo; to keep going.</p>
 			</PanelScope>
 		</>
 	);
@@ -211,7 +211,7 @@ function NavPanel ({chapters, current, bookmarks, position, startTab, onPick, on
 									</Button>
 								</li>
 							))}
-							{!bookmarks.length && <li className="vf-panel__note vf-bookmark__empty">No bookmarks in this book yet. They&apos;re shared with your other Audiobookshelf apps.</li>}
+							{!bookmarks.length && <li className="vf-panel__note vf-bookmark__empty">No bookmarks in this book yet.</li>}
 						</ol>
 					</div>
 				)}
@@ -262,7 +262,7 @@ function useNow (ms: number): number {
 }
 
 function SpeedPanel ({rate, onRate}: {rate: number; onRate: (r: number) => void}) {
-	const remainingNote = 'Your place is saved in book time, so it lines up with your phone at any speed.';
+	const remainingNote = 'Your place stays in sync at any speed.';
 	return (
 		<>
 			<div className="vf-scrim" />

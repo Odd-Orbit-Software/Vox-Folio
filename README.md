@@ -53,3 +53,5 @@ These are honoured only when `probe` is also present, so a normal launch never t
 - **Screensaver:** webOS asks registered apps before starting its own (`tvpower/power/registerScreenSaverRequest`). Vox Folio says no while it's visible and shows its own drifting screensaver (with the time) instead. After an hour on ours with nothing playing, it lets the TV's power-saving take over. The press that wakes it is swallowed.
 - **Audiobookshelf 2.37 auth:** log in with `x-return-tokens: true` to get a refresh token. Each refresh rotates it, so refreshes are serialised and every new pair is saved. Access tokens last 1 h, and the token in audio URLs is refreshed when the stream errors.
 - **Session `sync` and `close` answer with plain-text `OK`**, not JSON.
+- **Listening time goes in `timeListened`** (the seconds since the last sync), not `timeListening`. With the wrong name, the server still saves the position and answers 200 but records no listening time, and a session with none is never saved to history.
+- **Sessions only count once closed.** The app closes them when it's hidden or exits, after 10 paused minutes, and at the end of a book; Play then opens a new one.

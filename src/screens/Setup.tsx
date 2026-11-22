@@ -5,6 +5,7 @@ import mark from '../assets/vox-folio-mark.svg';
 import type {Credentials} from '../abs/client';
 import {Button, Icon, TextField} from '../components/controls';
 import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
+import {isBackKey} from '../platform/webos';
 
 interface SetupProps {
 	initialServer: string;
@@ -27,6 +28,22 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 	const [password, setPassword] = useState('');
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState(message);
+
+	// Back on the server step (reached with "Change server") returns to the account step rather than
+	// leaving sign-in altogether. Capture phase, so it runs before the app's Back handling.
+	useEffect(() => {
+		if (step !== 'server' || !initialServer) return undefined;
+		const onKeyDown = (ev: KeyboardEvent) => {
+			if (!isBackKey(ev.keyCode)) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			setServer(initialServer);
+			setError('');
+			setStep('account');
+		};
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
+	}, [step, initialServer]);
 
 	// Move focus to the new step's first control when the step changes.
 	useEffect(() => {
@@ -73,7 +90,7 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 			<div className="vf-setup__intro">
 				<img className="vf-logo-mark" src={mark} alt="" aria-hidden="true" />
 				<div className="vf-wordmark vf-wordmark--hero">Vox Folio</div>
-				<p className="vf-setup__lede">Your Audiobookshelf library, from the sofa. Sign in once and your place follows you between phone and TV.</p>
+				<p className="vf-setup__lede">Your Audiobookshelf library, from the sofa.</p>
 				{pendingItemId && (
 					<div className="vf-waiting">
 						<div className="vf-eyebrow vf-eyebrow--brass">Waiting to open</div>
@@ -104,7 +121,7 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 								onChange={setServer}
 								onSubmit={checkServer}
 								type="url"
-								placeholder="Press OK to type, e.g. abs.example.com"
+								placeholder="abs.example.com"
 								spotlightId="setup-server"
 								defaultFocus={!server}
 							/>
@@ -126,7 +143,7 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 								<span className="vf-field__ok">Connected</span>
 							</div>
 							<TextField label="USERNAME" value={username} onChange={setUsername} spotlightId="setup-user" autoComplete="username" defaultFocus={!username} />
-							<TextField label="PASSWORD" value={password} onChange={setPassword} onSubmit={signIn} type="password" placeholder="Press OK to type" spotlightId="setup-pass" autoComplete="current-password" />
+							<TextField label="PASSWORD" value={password} onChange={setPassword} onSubmit={signIn} type="password" spotlightId="setup-pass" autoComplete="current-password" />
 							<div className="vf-row">
 								<Button variant="primary" data-default-focus={username ? true : undefined} onClick={signIn} disabled={busy}>
 									{busy ? 'Signing in…' : 'Sign in'}
@@ -138,7 +155,6 @@ export default function Setup ({initialServer, message, pendingItemId, onSignedI
 				)}
 
 				<div className="vf-setup__error" role="alert">{error}</div>
-				<div className="vf-setup__footer">OK opens the TV keyboard</div>
 			</div>
 		</ScreenContainer>
 	);

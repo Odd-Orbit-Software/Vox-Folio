@@ -39,6 +39,7 @@ import Library from '../screens/Library';
 import Player from '../screens/Player';
 import SeriesDetail from '../screens/SeriesDetail';
 import Search, {presetSearch} from '../screens/Search';
+import Stats from '../screens/Stats';
 import SeriesList from '../screens/SeriesList';
 import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
@@ -69,6 +70,28 @@ function idleTimeoutMs (): number {
 // Created before React and Spotlight attach their key handlers, so it sees every press first.
 const idle = typeof window !== 'undefined' ? new IdleWatcher(idleTimeoutMs()) : (null as unknown as IdleWatcher);
 const subscribeIdle = (fn: () => void) => idle.subscribe(fn);
+
+/** Leave the app, closing the listening session first (briefly) so it's recorded. */
+function leaveApp (engine: PlayerEngine | null): void {
+	if (!engine) {
+		exitApp();
+		return;
+	}
+	let gone = false;
+	const go = () => {
+		if (!gone) {
+			gone = true;
+			exitApp();
+		}
+	};
+	engine.suspend(true).then(go, go);
+	window.setTimeout(go, 1500);
+}
+// Development: `perfectCorner` (with `probe`) starts the screensaver drift near a corner.
+const devCornerSoon = typeof window !== 'undefined' && (() => {
+	const p = readLaunchParams();
+	return typeof p.probe === 'string' && Boolean(p.perfectCorner);
+})();
 const getIdle = () => idle.asleep;
 
 const device = {
@@ -460,7 +483,9 @@ function App () {
 			if (!document.hidden) idle.wake();
 			const current = live.current.session;
 			if (!current) return;
-			if (document.hidden) current.engine.flush();
+			// Hidden (Home button, input switch, standby): close the session so the listening is
+			// recorded. Coming back, show a newer place from another device; Play opens a new session.
+			if (document.hidden) current.engine.suspend(true);
 			else current.engine.catchUp();
 		};
 		document.addEventListener('visibilitychange', onVisibility);
@@ -492,10 +517,10 @@ function App () {
 			if (isBackKey(code)) {
 				ev.preventDefault();
 				if (stackDepth > 1) setStack(pop);
-				else if (r.name === 'setup' || r.name === 'profiles') exitApp();
+				else if (r.name === 'setup' || r.name === 'profiles') leaveApp(e);
 				else if (r.name !== 'home') setStack(reset({name: 'home'}));
 				else if (loaded) setStack((st) => push(st, {name: 'player'}));
-				else exitApp();
+				else leaveApp(e);
 				return;
 			}
 			if (!e || !loaded) return;
@@ -515,7 +540,7 @@ function App () {
 	useEffect(() => {
 		const onUnload = () => {
 			const current = live.current.session;
-			if (current) current.engine.close();
+			if (current) current.engine.suspend(true);
 		};
 		window.addEventListener('beforeunload', onUnload);
 		return () => window.removeEventListener('beforeunload', onUnload);
@@ -702,8 +727,10 @@ function App () {
 					onSettings={onSettings}
 					onAbout={() => go({name: 'about'}, 'about')}
 					onSignOut={() => signOut('')}
+					onStats={() => go({name: 'stats'}, 'stats')}
 				/>
 			)}
+			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} />}
 			{route.name === 'about' && (
 				<About
 					version={appinfo.version}
@@ -713,7 +740,7 @@ function App () {
 				/>
 			)}
 			<Toasts toasts={toasts} />
-			{asleep && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} />}
+			{asleep && <Screensaver player={player} listener={profileInfo && profileInfo.shared ? profileInfo.name : ''} cornerSoon={devCornerSoon} />}
 		</div>
 		</ProfileContext.Provider>
 	);

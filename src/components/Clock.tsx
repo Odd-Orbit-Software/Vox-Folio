@@ -26,6 +26,12 @@ export function useClock (): string {
 	return text;
 }
 
+/** The hour (0–23), refreshed with the clock; -1 until the first tick. */
+export function useHour (): number {
+	const text = useClock();
+	return text ? parseInt(text.slice(0, 2), 10) : -1;
+}
+
 export function Clock ({className = ''}: {className?: string}) {
 	const text = useClock();
 	return <time className={'vf-clock ' + className}>{text}</time>;
