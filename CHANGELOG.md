@@ -3,6 +3,13 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.10.1
+
+- **Smaller saved copy of Home.** It now keeps only what Home shows, about 50 KB instead of 400 KB per account, which is easier on the TV's storage.
+- **Rejoin after leaving.** For a minute after Leave playlist, the player offers "Rejoin playlist".
+- **Playlist tab.** While a playlist plays, Red opens a Playlist tab beside Chapters and Bookmarks. Left and Right switch tabs, and Channel up and down jump eight at a time through long chapter lists and playlists.
+- **Remote buttons guide** (Settings → Help) explains what each button does, screen by screen.
+
 ## 0.10.0
 
 **The playlist in the player**

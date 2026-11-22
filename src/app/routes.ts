@@ -13,6 +13,7 @@ export type Route =
 	| {name: 'stats'}
 	| {name: 'yearReview'; year?: number}
 	| {name: 'diagnostics'}
+	| {name: 'remoteHelp'}
 	| {name: 'search'}
 	| {name: 'authors'}
 	| {name: 'author'; authorId: string; authorName: string}

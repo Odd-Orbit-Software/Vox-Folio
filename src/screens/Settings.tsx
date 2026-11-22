@@ -25,6 +25,7 @@ interface SettingsProps {
 	onStats: () => void;
 	onYearReview: () => void;
 	onDiagnostics: () => void;
+	onRemoteHelp: () => void;
 	onToast: (text: string) => void;
 	/** Save a default speed (and apply it now if that kind is playing). */
 	onSpeed: (kind: SpeedKind, rate: number) => void;
@@ -94,7 +95,7 @@ function nextSpeed (rate: number): number {
 	return above.length ? above[0] : SPEEDS[0];
 }
 
-export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onYearReview, onDiagnostics, onSpeed, onToast}: SettingsProps) {
+export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onYearReview, onDiagnostics, onRemoteHelp, onSpeed, onToast}: SettingsProps) {
 	const s = useSettings();
 	const premiumNow = isPremium();
 	const homeRows = orderedHomeRows(s).map((id) => HOME_ROWS.filter((r) => r.id === id)[0]).filter((r) => premiumNow || !r.premium);
@@ -223,6 +224,7 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 
 						<section className="vf-settings__group" aria-label="Help">
 							<h2 className="vf-eyebrow">Help</h2>
+							<Row id="remoteHelp" label="Remote buttons" hint="What the coloured buttons and CH +/− do on each screen" value="Open" onSelect={onRemoteHelp} />
 							<Row id="diagnostics" label="Diagnostics" hint="Versions, the connection to your server, live updates" value="Open" onSelect={onDiagnostics} />
 						</section>
 					</div>

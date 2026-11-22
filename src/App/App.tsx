@@ -54,6 +54,7 @@ import Stats from '../screens/Stats';
 import YearReview from '../screens/YearReview';
 import {dismissYearPrompt, yearToPrompt} from '../app/yearReview';
 import Diagnostics from '../screens/Diagnostics';
+import RemoteHelp from '../screens/RemoteHelp';
 import SeriesList from '../screens/SeriesList';
 import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
@@ -985,6 +986,7 @@ function App () {
 					onStats={() => go({name: 'stats'}, 'stats')}
 					onYearReview={() => go({name: 'yearReview'}, 'yearReview')}
 					onDiagnostics={() => go({name: 'diagnostics'}, 'diagnostics')}
+					onRemoteHelp={() => go({name: 'remoteHelp'}, 'remoteHelp')}
 					onToast={pushToast}
 					onSpeed={(kind, rate) => {
 						savePlaybackRate(rate, kind);
@@ -995,6 +997,7 @@ function App () {
 				/>
 			)}
 			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} onYearReview={() => go({name: 'yearReview'}, 'year')} />}
+			{route.name === 'remoteHelp' && <RemoteHelp onDone={() => setStack(pop)} />}
 			{route.name === 'diagnostics' && client && <Diagnostics client={client} version={appinfo.version} onDone={() => setStack(pop)} onToast={pushToast} />}
 			{route.name === 'yearReview' && client && <YearReview client={client} initialYear={route.year} restoreKey={top.focusKey} onDone={() => setStack(pop)} onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)} />}
 			{route.name === 'about' && (

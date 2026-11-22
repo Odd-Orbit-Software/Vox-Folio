@@ -303,6 +303,33 @@ The user is using the TV: **ask before any TV test**, and batch the tests so you
   - Next: 0.10.0 queue panel.
   - Each commit was typechecked on its own with `scratchpad/checkstaged.sh`.
 
+## Batch 3 (agreed 2026-11-22, after 0.10.0 was pushed)
+
+**Ask before any TV test.** For each item: build it, check it in the desktop browser, run the impeccable review, and fix what it finds. Then do one TV session with the user's OK, and commit each item separately under a single bump to 0.10.1.
+
+| # | Item | Status |
+| --- | --- | --- |
+| J1 | Slim the saved Home: keep only the fields Home draws (it was about 400 KB per account) | done (0.10.1) |
+| J2 | Undo after Leave playlist: a "Rejoin <playlist>" chip in the player for 30 s | done (0.10.1) |
+| J3 | Playlist tab in the Red panel (Chapters · Bookmarks · Playlist) while a playlist plays | done (0.10.1) |
+| J4 | Remote buttons guide under Settings → Help | done (0.10.1) |
+
+### Batch 3 notes
+- **J1:** `src/app/slim.ts` (+ test). Home saves slim items, episodes and series. The size went from 408 KB to 53 KB. Series entities have no `media`, and the test caught a crash on them.
+- **J2:** App `leftQueue` (60 s). There is one chip element for both "2 of 3" and Rejoin, so focus stays on it. After Leave, focus goes to Play. The toast says "Rejoined X".
+- **J3:** NavPanel tabs (chapters / bookmarks unless episode / playlist when queue), plus `QueueList`, which the playlist panel shares.
+  - Left/Right on rows switch tabs.
+  - CH+/− page by 8 in chapter and playlist lists (`pageBy`).
+  - With 3 tabs, "Back to close" moves to a footer.
+  - Red works for episodes in a playlist, and the chip says "Playlist".
+- **J4:** `RemoteHelp.tsx`, route `remoteHelp`, under Settings → Help → Remote buttons. Reviewed and corrected: Blue bookmark applies to books only; Back from Home opens the player; Stop pauses; play/pause shows as an icon.
+- Review: impeccable, with the detector clean.
+
+### Batch 3: TV test (with the user's OK)
+- On claude-test-2: the Playlist tab with its footer, Leave then focus to Play, Rejoin keeping focus on "2 of 3", the Remote guide, and Diagnostics. Every check passed.
+- The Weekend queue is active again on claude-test-2.
+- The other two accounts' saved Homes shrink the next time they open Home (537 KB for 3 at test time).
+
 ## Log
 
 - 2026-11-22: The user asked to centre the round profile avatars' initials vertically (Newsreader caps sit high). Fixed in 0.8.1.
