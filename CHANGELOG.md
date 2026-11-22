@@ -3,6 +3,12 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.9.1
+
+- **Undo for live jumps.** When another device moves a book that's paused on the TV, the player offers "Back to …" for a minute.
+- **Year in Review on Home.** From December to mid-January, Home offers your year in listening. "Later" asks again in a week, and each person on the TV gets their own reminder.
+- **Clickable covers in Year in Review.** OK on a cover opens that book. Back returns to the same year and cover.
+
 ## 0.9.0
 
 **More settings**

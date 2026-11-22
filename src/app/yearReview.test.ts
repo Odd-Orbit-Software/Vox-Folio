@@ -1,4 +1,4 @@
-import {normaliseYearStats, summariseYear, tidyGenres} from './yearReview';
+import {dismissYearPrompt, normaliseYearStats, snoozeYearPrompt, summariseYear, tidyGenres, yearToPrompt} from './yearReview';
 
 const raw = {
 	totalListeningSessions: 40, totalListeningTime: 94 * 3600, totalBookListeningTime: 80 * 3600, totalPodcastListeningTime: 14 * 3600,
@@ -33,5 +33,28 @@ describe('year in review', () => {
 		expect(s.headline).toBe('0 minutes');
 		expect(s.topAuthor).toBeNull();
 		expect(s.longest).toBeNull();
+	});
+});
+
+describe('the Home prompt', () => {
+	test('runs from December to mid-January, for the year just gone', () => {
+		expect(yearToPrompt(new Date(2026, 11, 3), 'u')).toBe(2026);
+		expect(yearToPrompt(new Date(2027, 0, 10), 'u')).toBe(2026);
+		expect(yearToPrompt(new Date(2027, 0, 20), 'u')).toBeNull();
+		expect(yearToPrompt(new Date(2026, 10, 22), 'u')).toBeNull();
+		expect(yearToPrompt(new Date(2026, 10, 22), 'u', true)).toBe(2026);
+	});
+
+	test('stays away once seen, for that listener only', () => {
+		dismissYearPrompt('a', 2026);
+		expect(yearToPrompt(new Date(2026, 11, 3), 'a')).toBeNull();
+		expect(yearToPrompt(new Date(2026, 11, 3), 'b')).toBe(2026);
+		expect(yearToPrompt(new Date(2027, 11, 3), 'a')).toBe(2027);
+	});
+
+	test('Later asks again in a week', () => {
+		snoozeYearPrompt('c', new Date(2026, 11, 3));
+		expect(yearToPrompt(new Date(2026, 11, 6), 'c')).toBeNull();
+		expect(yearToPrompt(new Date(2026, 11, 11), 'c')).toBe(2026);
 	});
 });

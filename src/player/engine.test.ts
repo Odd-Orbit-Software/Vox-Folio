@@ -323,6 +323,20 @@ describe('live progress from other devices', () => {
 		expect(engine.getState().notice && engine.getState().notice!.text).toMatch(/another device/);
 	});
 
+	test('the jump can be undone for a minute, and the offer ends when playback starts', async () => {
+		const {engine} = await openEngine();
+		engine.pause();
+		await flush();
+		engine.applyRemoteProgress(remote(400), 'phone-session');
+		expect(engine.getState().remoteJump).toEqual({from: 100, to: 400});
+		engine.undoRemoteJump();
+		expect(engine.getState().position).toBe(100);
+		expect(engine.getState().remoteJump).toBeNull();
+		engine.applyRemoteProgress(remote(500), 'phone-session');
+		engine.play();
+		expect(engine.getState().remoteJump).toBeNull();
+	});
+
 	test('while playing here, our own position wins', async () => {
 		const {engine} = await openEngine();
 		expect(engine.applyRemoteProgress(remote(400), 'phone-session', 'Pixel')).toBe(false);

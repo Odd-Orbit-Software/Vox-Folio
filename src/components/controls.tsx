@@ -170,6 +170,7 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 		case 'podcast': return <svg {...common}><g {...stroke}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" /></g></svg>;
 		case 'bookmark': return <svg {...common}><path {...stroke} d="M6 3h12v18l-6-4-6 4z" /></svg>;
 		case 'close': return <svg {...common}><path {...stroke} d="M6 6l12 12M18 6L6 18" /></svg>;
+		case 'undo': return <svg {...common}><path {...stroke} d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" /></svg>;
 		case 'chevronLeft': return <svg {...common}><path {...stroke} d="M15 6l-6 6 6 6" /></svg>;
 		case 'queue': return <svg {...common}><path {...stroke} d="M4 6h12M4 11h12M4 16h7M16 14v6l5-3z" /></svg>;
 		case 'filter': return <svg {...common}><path {...stroke} d="M4 5h16l-6 7.5V19l-4-2v-4.5z" /></svg>;
@@ -200,4 +201,4 @@ export function Icon ({name, size = 30}: {name: IconName; size?: number}) {
 	}
 }
 
-export type IconName = 'chevronLeft' | 'queue' | 'filter' | 'podcast' | 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';
+export type IconName = 'undo' | 'chevronLeft' | 'queue' | 'filter' | 'podcast' | 'bookmark' | 'close' | 'search' | 'authors' | 'settings' | 'chevronRight' | 'moon' | 'home' | 'library' | 'series' | 'chapters' | 'autoplay' | 'play' | 'pause' | 'back30' | 'fwd30' | 'prevChapter' | 'nextChapter' | 'chevronDown' | 'back' | 'cloud' | 'cloudOff' | 'check' | 'info' | 'alert';

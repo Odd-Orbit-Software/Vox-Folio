@@ -3260,8 +3260,12 @@
 
 .vf-year__covers > .vf-year__cover {
 	margin: 0 12px 12px 0;
+	padding: 0;
 	border-radius: 10px;
-	/* A small blur: twelve large soft shadows are costly on the TV's compositor. */
+}
+
+/* A small blur: twelve large soft shadows are costly on the TV's compositor. The focus ring replaces it. */
+.vf-year__covers > .vf-year__cover:not(:focus) {
 	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 

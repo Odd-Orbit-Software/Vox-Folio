@@ -61,6 +61,8 @@ export interface PlayerState {
 	/** A short message to show once, such as catching up with another device. */
 	notice: {id: number; text: string} | null;
 	sleep: SleepState | null;
+	/** Set for a while after another device moved this paused book: where it was, to go back. */
+	remoteJump: {from: number; to: number} | null;
 }
 
 const SYNC_INTERVAL_MS = 15000;
@@ -69,6 +71,8 @@ const PAUSE_CLOSE_MS = 10 * 60 * 1000;
 const MAX_TICK_S = 5;
 /** Server ahead of us by more than this after a reconnect means another device listened meanwhile. */
 const ADVANCED_THRESHOLD_S = 5;
+/** How long "Back to …" is offered after another device moves a paused book. */
+const REMOTE_UNDO_MS = 60 * 1000;
 
 const MIME_CANDIDATES = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/flac', 'audio/ogg', 'audio/webm', 'audio/wav'];
 
@@ -111,7 +115,8 @@ export const idlePlayerState: PlayerState = {
 	syncError: null,
 	error: null,
 	notice: null,
-	sleep: null
+	sleep: null,
+	remoteJump: null
 };
 
 export class PlayerEngine {
@@ -423,6 +428,7 @@ export class PlayerEngine {
 			if (back > 0) this.seek(rewindWithinChapter(this.state.chapters, this.state.position, back));
 		}
 		this.pausedAt = null;
+		if (this.state.remoteJump) this.set({remoteJump: null});
 		this.audio.play().catch(() => undefined);
 	}
 
@@ -598,12 +604,30 @@ export class PlayerEngine {
 		if (progress.isFinished || Math.abs(progress.currentTime - s.position) <= ADVANCED_THRESHOLD_S) return false;
 		// The same small step back as any other resume from another device.
 		const back = this.smartRewind ? smartRewindSeconds(Date.now() - progress.lastUpdate) : 0;
-		this.seek(rewindWithinChapter(this.state.chapters, progress.currentTime, back));
+		const from = s.position;
+		const to = rewindWithinChapter(this.state.chapters, progress.currentTime, back);
+		this.seek(to);
+		// Offer the way back for a minute, until playback starts.
+		this.set({remoteJump: {from, to}});
+		if (this.remoteJumpTimer !== null) window.clearTimeout(this.remoteJumpTimer);
+		this.remoteJumpTimer = window.setTimeout(() => {
+			this.remoteJumpTimer = null;
+			this.set({remoteJump: null});
+		}, REMOTE_UNDO_MS);
 		this.listened = 0;
 		this.lastSyncOk = Date.now();
 		if (this.suspendedAt !== null) this.suspendedAt = Date.now();
-		this.notify('Picked up from another device at ' + formatClock(progress.currentTime));
+		this.notify('Picked up from another device at ' + formatClock(to));
 		return true;
+	}
+
+	/** Go back to where this book was before another device moved it. */
+	undoRemoteJump (): void {
+		const jump = this.state.remoteJump;
+		if (!jump) return;
+		this.set({remoteJump: null});
+		this.seek(jump.from);
+		this.notify('Back to ' + formatClock(jump.from));
 	}
 
 	/** Sync now, e.g. when the app is hidden. */

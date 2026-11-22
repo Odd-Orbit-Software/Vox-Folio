@@ -350,6 +350,14 @@ export default function Player ({engine, player, autoplay, queueLabel, next, nex
 		wasOpen.current = panel;
 	}, [panel]);
 
+	// The "Back to …" chip goes away after a minute; if it had focus, focus returns to Play.
+	const hadJump = useRef(false);
+	useEffect(() => {
+		const active = document.activeElement as HTMLElement | null;
+		if (hadJump.current && !player.remoteJump && (!active || active === document.body)) focusWithin('player', 'play');
+		hadJump.current = Boolean(player.remoteJump);
+	}, [player.remoteJump]);
+
 	// When Up Next goes away (declined, or the next book started), return focus to the controls.
 	const upNextWas = useRef(false);
 	useEffect(() => {
@@ -446,6 +454,18 @@ export default function Player ({engine, player, autoplay, queueLabel, next, nex
 				<div className="vf-player__left">
 					{p.status === 'ended' ? 'Finished' : formatDuration(left) + ' left' + (p.rate !== 1 ? ' · ' + formatDuration(left / p.rate) + ' at ' + formatRate(p.rate) : '')}
 				</div>
+				{p.remoteJump && (
+					<div className="vf-player__jump">
+						<span className="vf-muted">{'Moved to ' + formatClock(p.remoteJump.to) + ' by another device'}</span>
+						<Button variant="chip" data-focus-key="undo-jump" onClick={() => {
+							engine.undoRemoteJump();
+							focusWithin('player', 'play');
+						}}
+						>
+							<Icon name="undo" size={22} />{'Back to ' + formatClock(p.remoteJump.from)}
+						</Button>
+					</div>
+				)}
 			</div>
 
 			<div className="vf-player__controls">

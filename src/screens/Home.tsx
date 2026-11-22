@@ -40,6 +40,9 @@ interface HomeProps {
 	onOpenSeries: (libraryId: string, seriesId: string, name: string, fromKey: string) => void;
 	/** Settings, at the Home rows section. */
 	onCustomise: () => void;
+	/** ★ In December and early January: the year to offer a review of. */
+	yearPrompt: number | null;
+	onOpenYear: (year: number) => void;
 }
 
 interface Entry {
@@ -141,9 +144,11 @@ function percent (e: Entry): number {
 	return e.progress ? Math.round(e.progress.progress * 100) : 0;
 }
 
-export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings, onToast, onOpenSeries, onCustomise}: HomeProps) {
+export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings, onToast, onOpenSeries, onCustomise, yearPrompt, onOpenYear}: HomeProps) {
 	const [cached] = useState(() => readCache(client));
 	const settings = useSettings();
+	// "Not now" hides the Year in Review prompt straight away.
+	const [promptYear, setPromptYear] = useState(yearPrompt);
 	const [load, setLoad] = useState<Load>(() => (cached && cached.entries.length
 		? {state: 'ready', entries: cached.entries, progress: cached.progress}
 		: {state: 'loading'}));
@@ -529,23 +534,26 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 					</section>
 				)}
 
-				{showInProgress && rest.length > 0 && (
-					<CoverRow
-						title="In progress"
-						items={restItems}
-						onSelect={openTile}
-						action={{label: undoable ? 'Undo remove' : 'Remove from Continue listening', onAction: (g) => {
-							const e = rest.filter((r) => tileKey(r) === g.key)[0];
-							if (e) removeEntry(entryKey(e));
-						}}}
-					/>
+				{promptYear !== null && load.state === 'ready' && (
+					<section className="vf-yearprompt" data-vrow aria-label={'Your ' + promptYear + ' in listening'}>
+						<div className="vf-yearprompt__text">
+							<div className="vf-eyebrow vf-eyebrow--brass">Your year in listening</div>
+							<div className="vf-yearprompt__title">{'Your ' + promptYear + ' is ready to look back on'}</div>
+						</div>
+						<div className="vf-row vf-row--spaced">
+							<Button data-focus-key="year-prompt" onClick={() => onOpenYear(promptYear)}>See your year</Button>
+							<Button data-focus-key="year-dismiss" onClick={() => {
+								snoozeYearPrompt(client.credentials.userId, new Date());
+								setPromptYear(null);
+								window.setTimeout(() => focusWithin('home', null), 0);
+							}}
+							>
+								Later
+							</Button>
+						</div>
+					</section>
 				)}
-				{showNewEpisodes && newEpisodes.length > 0 && (
-					<CoverRow title="New episodes" items={newEpisodes} defaultFocus={!hero && !nowPlaying} onSelect={openTile} />
-				)}
-				{extraRows.map((r, i) => (
-					<CoverRow key={r.id} title={r.label} items={r.items} defaultFocus={!hero && !nowPlaying && !(showNewEpisodes && newEpisodes.length) && i === 0} onSelect={(g) => openShelfTile(r, g)} />
-				))}
+				{rowsInOrder}
 
 				{load.state === 'ready' && (
 					<div className="vf-home__customise" data-vrow>

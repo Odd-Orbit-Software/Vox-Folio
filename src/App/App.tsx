@@ -101,6 +101,11 @@ function leaveApp (engine: PlayerEngine | null): void {
 	engine.suspend(true).then(go, go);
 	window.setTimeout(go, 1500);
 }
+// Development: `yearPrompt` (with `probe`) shows Home's Year in Review prompt out of season.
+const devYearPrompt = typeof window !== 'undefined' && (() => {
+	const p = readLaunchParams();
+	return typeof p.probe === 'string' && Boolean(p.yearPrompt);
+})();
 // Development: `perfectCorner` (with `probe`) starts the screensaver drift near a corner.
 const devCornerSoon = typeof window !== 'undefined' && (() => {
 	const p = readLaunchParams();
@@ -765,6 +770,11 @@ function App () {
 					onSettings={onSettings}
 					onToast={pushToast}
 					onOpenSeries={(libraryId, seriesId, seriesName, fromKey) => go({name: 'seriesDetail', libraryId, seriesId, seriesName}, fromKey)}
+					yearPrompt={isPremium() ? yearToPrompt(new Date(), client.credentials.userId, devYearPrompt) : null}
+					onOpenYear={(year) => {
+						dismissYearPrompt(client.credentials.userId, year);
+						go({name: 'yearReview', year}, 'year-prompt');
+					}}
 					onCustomise={() => setStack(reset({name: 'settings'}).map((e) => ({...e, focusKey: 'home:in-progress'})))}
 				/>
 			)}
