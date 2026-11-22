@@ -3,6 +3,14 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.7.0
+
+**Live progress**
+- Vox Folio now hears straight away when another app (Audiobookshelf on your phone, Absorb) saves your place. A book paused on the TV moves to the new spot with "Picked up from another device", and Home updates its cards and progress while you look at it.
+- If the same book is playing on the TV and somewhere else at once, a note says so, since the last one to stop keeps the place.
+- Home never swaps the main card while it has focus. After a refresh, focus returns to the tile you were on.
+- The connection comes back on its own after standby or a dropped network, and signs in again if the TV was away long enough for the sign-in to expire.
+
 ## 0.6.0
 
 **Choose your Home rows**

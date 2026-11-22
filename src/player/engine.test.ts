@@ -311,6 +311,36 @@ test('catching up leaves our position alone when the server has nothing newer', 
 	expect(engine.getState().position).toBe(100);
 });
 
+describe('live progress from other devices', () => {
+	const remote = (currentTime: number, extra: Record<string, unknown> = {}) => ({libraryItemId: 'item-1', currentTime, duration: 1200, progress: currentTime / 1200, isFinished: false, lastUpdate: 1_000_000, ...extra});
+
+	test('a paused book follows a position pushed by another device', async () => {
+		const {engine} = await openEngine();
+		engine.pause();
+		await flush();
+		expect(engine.applyRemoteProgress(remote(400), 'phone-session')).toBe(true);
+		expect(engine.getState().position).toBe(400);
+		expect(engine.getState().notice && engine.getState().notice!.text).toMatch(/another device/);
+	});
+
+	test('while playing here, our own position wins', async () => {
+		const {engine} = await openEngine();
+		expect(engine.applyRemoteProgress(remote(400), 'phone-session', 'Pixel')).toBe(false);
+		expect(engine.getState().position).toBe(100);
+		expect(engine.getState().notice && engine.getState().notice!.text).toMatch(/Also playing on Pixel/);
+	});
+
+	test('ignores other books, tiny differences and finished records', async () => {
+		const {engine} = await openEngine();
+		engine.pause();
+		await flush();
+		expect(engine.applyRemoteProgress({...remote(400), libraryItemId: 'other'}, 'x')).toBe(false);
+		expect(engine.applyRemoteProgress(remote(102), 'x')).toBe(false);
+		expect(engine.applyRemoteProgress(remote(400, {isFinished: true}), 'x')).toBe(false);
+		expect(engine.getState().position).toBe(100);
+	});
+});
+
 test('can start over from the beginning instead of the saved position', async () => {
 	const c = makeClient();
 	const audio = new FakeAudio();

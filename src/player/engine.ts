@@ -10,7 +10,7 @@
 
 import {AbsError, progressKey} from '../abs/client';
 import type {AbsClient, DeviceInfo} from '../abs/client';
-import type {AudioTrack, Chapter, PlaybackSession, PodcastEpisode, SeriesRef} from '../abs/types';
+import type {AudioTrack, Chapter, MediaProgress, PlaybackSession, PodcastEpisode, SeriesRef} from '../abs/types';
 import {loadPlaybackRate, savePlaybackRate} from '../abs/store';
 import {PlayRateController} from '../platform/playRate';
 import {
@@ -144,6 +144,8 @@ export class PlayerEngine {
 	private sleepTick: number | null = null;
 	/** Timer mode's running remainder; published state is only refreshed when something visible changes. */
 	private sleepLeftMs = 0;
+	/** Other devices' sessions already warned about playing at the same time. */
+	private warnedSessions: string[] = [];
 	/** Step back a little on resume, more after longer pauses (settings). */
 	smartRewind = true;
 
@@ -567,6 +569,32 @@ export class PlayerEngine {
 		} catch {
 			// Offline: keep our position; the next sync will check again.
 		}
+	}
+
+	/** Another device saved a position (pushed live by the server). While this book is paused here,
+	    follow it at once; while it plays here, our own syncs win. Returns true when it moved. */
+	applyRemoteProgress (progress: MediaProgress, fromSessionId?: string, device?: string): boolean {
+		const s = this.state;
+		if (!s.itemId || progress.libraryItemId !== s.itemId || (progress.episodeId || null) !== (s.episodeId || null)) return false;
+		if (this.session && fromSessionId && fromSessionId === this.session.id) return false;
+		if (!this.audio.paused) {
+			// Both playing at once: they'll keep overwriting each other's place. Say so, once.
+			if (fromSessionId && this.warnedSessions.indexOf(fromSessionId) === -1) {
+				this.warnedSessions.push(fromSessionId);
+				this.notify('Also playing on ' + (device || 'another device') + '. The last one to stop keeps the place.');
+			}
+			return false;
+		}
+		if (s.status === 'loading' || this.syncing) return false;
+		if (progress.isFinished || Math.abs(progress.currentTime - s.position) <= ADVANCED_THRESHOLD_S) return false;
+		// The same small step back as any other resume from another device.
+		const back = this.smartRewind ? smartRewindSeconds(Date.now() - progress.lastUpdate) : 0;
+		this.seek(rewindWithinChapter(this.state.chapters, progress.currentTime, back));
+		this.listened = 0;
+		this.lastSyncOk = Date.now();
+		if (this.suspendedAt !== null) this.suspendedAt = Date.now();
+		this.notify('Picked up from another device at ' + formatClock(progress.currentTime));
+		return true;
 	}
 
 	/** Sync now, e.g. when the app is hidden. */

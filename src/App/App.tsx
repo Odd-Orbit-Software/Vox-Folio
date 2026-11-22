@@ -38,6 +38,8 @@ import AuthorScreen from '../screens/Author';
 import Authors from '../screens/Authors';
 import BookList from '../screens/BookList';
 import Collections from '../screens/Collections';
+import {LiveSocket} from '../abs/socket';
+import {publishProgress} from '../app/live';
 import {loadQueue, nextInQueue, queueIndex, saveQueue} from '../app/queue';
 import type {Queue} from '../app/queue';
 import Details from '../screens/Details';
@@ -543,6 +545,35 @@ function App () {
 		openBook(current.engine, startKey, {fromKey, keepQueue: true});
 		setQueue({...q, userId: current.client.credentials.userId});
 	}, [openBook]);
+
+	/* Live updates: when the phone (or any other app) saves a position, the server tells us at once. A
+	   paused book here jumps to it, and Home refreshes what it shows. */
+	useEffect(() => {
+		if (!client || !engine) return undefined;
+		const sock = new LiveSocket(client.credentials.serverUrl, () => client.credentials.accessToken, (e) => {
+			report({kind: 'live', type: e.type, item: e.type === 'progress' ? e.progress.data.libraryItemId : null});
+			if (e.type === 'progress') {
+				engine.applyRemoteProgress(e.progress.data, e.progress.sessionId, e.progress.deviceDescription);
+				publishProgress(e.progress.data);
+			} else if (e.type === 'userUpdated') {
+				publishProgress(null);
+			} else if (e.type === 'authFailed') {
+				// The token expired while we were away: get a fresh one and sign the socket in again.
+				client.refresh().then(() => sock.reauth(), () => undefined);
+			}
+		});
+		sock.start();
+		// After standby the connection may have dropped without notice, or the token expired:
+		// freshen the token, then reconnect if needed.
+		const onVisible = () => {
+			if (!document.hidden) client.ensureFresh().then(() => sock.wake());
+		};
+		document.addEventListener('visibilitychange', onVisible);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisible);
+			sock.stop();
+		};
+	}, [client, engine]);
 
 	// The playlist survives a relaunch (for the same account).
 	useEffect(() => {

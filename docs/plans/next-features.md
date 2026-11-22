@@ -21,7 +21,7 @@ Step through TV keys one at a time and log focus. Don't send long blind key sequ
 | B | Library filters (progress, genre, tag, narrator, language) | 0.4.0 | done (committed on `features`) |
 | C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | done (committed on `features`) |
 | D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | done (committed on `features`) |
-| E | Live progress from the server (socket) | 0.7.0 | todo |
+| E | Live progress from the server (socket) | 0.7.0 | done (committed on `features`) |
 | F | Year in Review | 0.8.0 | todo |
 
 Not doing: e-books and comics, adding or downloading podcasts, metadata editing, RSS, single sign-on.
@@ -156,6 +156,29 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
 - Hand-rolled socket.io v4 over WebSocket: `/socket.io/?EIO=4&transport=websocket`, then `40`, then `42["auth", token]`. Answer each ping `2` with `3`.
 - Events: `user_item_progress_updated` and others.
 - Notes:
+  - Built:
+    - `src/abs/socket.ts` (`LiveSocket`, `parsePacket`, `socketUrl`, + test). Backoff is 2/5/15/30/60 s, with `wake()` on visibility.
+    - `src/app/live.ts` fans updates out.
+    - `engine.applyRemoteProgress`, which runs only while paused and ignores events from our own session, finished items, and changes of 5 s or less (+ 3 tests).
+    - App creates the socket per session. Home patches progress in place and reloads (debounced 3 s) for unknown or finished keys.
+  - Server facts:
+    - `/api/me/items-in-progress` does not filter hidden items.
+    - The socket authenticates once with `42["auth", token]`.
+    - The event payload is `{id, sessionId, deviceDescription, data: MediaProgress}`.
+  - TV-tested on claude-test-2 with `scratchpad/phone2.py <item> <secs>` (claude-test-2's "phone"):
+    - The Martian, paused at 0:27, jumped to 10:00 with a toast within about 3 s.
+    - Home made Project Hail Mary the hero after the phone saved 300 s on it.
+  - Probe log tip: the file gets null bytes after truncation, so run `tr -d '\000'` before grep.
+  - UX review (impeccable; the detector came back clean). Fixes applied:
+    - `auth_failed` leads to `client.refresh()`, then `reauth()`. On becoming visible, the app runs `ensureFresh()`, then `wake()`.
+    - A silence watchdog (70 s) drops half-open sockets.
+    - The live jump applies smart rewind like the other catch-ups.
+    - While playing, an event from another session gives one "Also playing on <device>" notice per session.
+    - Home postpones a structural reload while focus is on the hero, and refocuses the same tile key after a reload.
+  - Left for later:
+    - Undo for a live jump.
+    - Connection status in a diagnostics view.
+  - Heaven's River on claude-test-2 is now at 6000 s (it was 5713) after the retest.
 
 ## F. Year in Review
 

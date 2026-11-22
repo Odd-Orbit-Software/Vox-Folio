@@ -4,6 +4,7 @@ import type {KeyboardEvent} from 'react';
 import {AbsClient, AbsError} from '../abs/client';
 import {progressKey} from '../abs/client';
 import type {LibraryItem, MediaProgress, PodcastEpisode, Shelf} from '../abs/types';
+import {subscribeProgress} from '../app/live';
 import {episodeDate, episodeTitle, podcastLibraryId} from '../app/podcasts';
 import {isPremium} from '../app/premium';
 import type {Route} from '../app/routes';
@@ -216,6 +217,61 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 			cancelled = true;
 		};
 	}, [client, reload]);
+
+	const loadRef = useRef(load);
+	// After a live reload, focus goes back to the same tile wherever it now sits.
+	const refocusKey = useRef<string | null>(null);
+	useEffect(() => {
+		loadRef.current = load;
+		const key = refocusKey.current;
+		if (!key) return;
+		refocusKey.current = null;
+		window.setTimeout(() => {
+			if (document.querySelector('[data-spotlight-id="home"] [data-focus-key="' + key + '"]')) focusWithin('home', key);
+		}, 0);
+	}, [load]);
+
+	/* Live progress from the server: update the bars in place; something new (or finished) in
+	   progress means the list itself changed, so reload it, at most every few seconds. */
+	useEffect(() => {
+		let timer: number | null = null;
+		const reloadSoon = () => {
+			if (timer !== null) return;
+			timer = window.setTimeout(() => {
+				timer = null;
+				const active = document.activeElement as HTMLElement | null;
+				// Never swap the main card under the listener's finger: wait until focus leaves it.
+				if (active && active.closest('.vf-hero')) {
+					reloadSoon();
+					return;
+				}
+				refocusKey.current = active && active.closest('[data-spotlight-id="home"]') ? active.getAttribute('data-focus-key') : null;
+				setReload((n) => n + 1);
+			}, 3000);
+		};
+		const unsubscribe = subscribeProgress((p) => {
+			if (!p) {
+				reloadSoon();
+				return;
+			}
+			const key = progressKey(p.libraryItemId, p.episodeId);
+			const now = loadRef.current;
+			const known = now.state === 'ready' && now.entries.some((e) => entryKey(e) === key);
+			setLoad((prev) => {
+				if (prev.state !== 'ready') return prev;
+				return {
+					...prev,
+					progress: {...prev.progress, [key]: p},
+					entries: prev.entries.map((e) => (entryKey(e) === key ? {...e, progress: p} : e))
+				};
+			});
+			if (!known || p.isFinished) reloadSoon();
+		});
+		return () => {
+			unsubscribe();
+			if (timer !== null) window.clearTimeout(timer);
+		};
+	}, []);
 
 	const retry = () => {
 		setStale(null);
