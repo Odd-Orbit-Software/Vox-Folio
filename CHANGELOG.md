@@ -3,6 +3,12 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.8.0
+
+**Year in Review ★**
+- A page for your year in listening: total hours (and a weekly average), the author and narrator you listened to most, top genres, books finished, your busiest month, the longest book you finished, and the covers of the year.
+- Look back at the two previous years too. Open it from Settings or from Listening stats.
+
 ## 0.7.0
 
 **Live progress**

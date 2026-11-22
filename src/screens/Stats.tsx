@@ -12,6 +12,7 @@ import {formatDuration} from '../player/timeline';
 interface StatsProps {
 	client: AbsClient;
 	onDone: () => void;
+	onYearReview: () => void;
 }
 
 function hours (seconds: number): string {
@@ -24,11 +25,12 @@ function days (n: number): string {
 }
 
 /** Listening stats (★): time listened, streaks and books finished. */
-export default function Stats ({client, onDone}: StatsProps) {
+export default function Stats ({client, onDone, onYearReview}: StatsProps) {
 	const [summary, setSummary] = useState<StatsSummary | null>(null);
 	const [error, setError] = useState<AbsError | null>(null);
 	// The secret count only appears once you've seen one.
 	const [corners] = useState(perfectCorners);
+	const [thisYear] = useState(() => new Date().getFullYear());
 
 	useEffect(() => {
 		let cancelled = false;
@@ -93,6 +95,7 @@ export default function Stats ({client, onDone}: StatsProps) {
 			)}
 			<div className="vf-stats__done">
 				<Button variant="primary" data-default-focus onClick={onDone}>Done</Button>
+				<Button data-focus-key="year" onClick={onYearReview}>{'Your ' + thisYear + ' in review'}</Button>
 			</div>
 		</ScreenContainer>
 	);

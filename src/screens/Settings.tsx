@@ -22,6 +22,7 @@ interface SettingsProps {
 	onAbout: () => void;
 	onSignOut: () => void;
 	onStats: () => void;
+	onYearReview: () => void;
 	/** Save a default speed (and apply it now if that kind is playing). */
 	onSpeed: (kind: SpeedKind, rate: number) => void;
 }
@@ -80,7 +81,7 @@ function nextSpeed (rate: number): number {
 	return above.length ? above[0] : SPEEDS[0];
 }
 
-export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onSpeed}: SettingsProps) {
+export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout, onSignOut, onStats, onYearReview, onSpeed}: SettingsProps) {
 	const s = useSettings();
 	const premium = isPremium();
 	const [speeds, setSpeeds] = useState(() => ({book: loadPlaybackRate('book'), podcast: loadPlaybackRate('podcast')}));
@@ -155,6 +156,7 @@ export default function Settings ({creds, restoreKey, onTab, onSettings, onAbout
 							<h2 className="vf-eyebrow">Screensaver and stats</h2>
 							<Row id="nightMode" label="Screensaver night mode ★" hint="Dimmer and slower from 10pm to 6am" value={premium ? onOff(s.nightMode) : '★ Premium'} off={premium && !s.nightMode} onSelect={() => premium && updateSettings({nightMode: !s.nightMode})} />
 							<Row id="stats" label="Listening stats ★" hint="Time listened, streaks, and books finished" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onStats()} />
+							<Row id="yearReview" label="Year in review ★" hint="Your listening year: hours, books, favourite authors" value={premium ? 'Open' : '★ Premium'} onSelect={() => premium && onYearReview()} />
 						</section>
 					</div>
 				</div>

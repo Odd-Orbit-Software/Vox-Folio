@@ -22,7 +22,7 @@ Step through TV keys one at a time and log focus. Don't send long blind key sequ
 | C | Play a playlist in order (books and episodes), with Up Next | 0.5.0 | done (committed on `features`) |
 | D | More Home shelves, each switchable in Settings; settings scan | 0.6.0 | done (committed on `features`) |
 | E | Live progress from the server (socket) | 0.7.0 | done (committed on `features`) |
-| F | Year in Review | 0.8.0 | todo |
+| F | Year in Review | 0.8.0 | done (committed on `features`) |
 
 Not doing: e-books and comics, adding or downloading podcasts, metadata editing, RSS, single sign-on.
 
@@ -184,7 +184,32 @@ Not doing: e-books and comics, adding or downloading podcasts, metadata editing,
 
 - `GET /api/me/stats/year/{year}`.
 - Notes:
+  - Built:
+    - `src/app/yearReview.ts` (`normaliseYearStats`, `summariseYear`, `tidyGenres`, + test).
+    - `src/screens/YearReview.tsx`, route `yearReview`. Year chips for this year and the two before.
+    - The page shows the total in large type, the weekly average, stat tiles, facts (top author, top narrator, top genres, longest finished), and a cover mosaic with finished books first.
+    - Opened from Settings ("Year in review ★") and from the Stats page.
+  - TV-tested:
+    - claude-test-2: 20 minutes of listening, 4 covers.
+    - pmck, view only (the picker defaults to pmck now; there's no "right" before OK): 193 hours, 16 finished, July, Matt Dinniman / Jeff Hays, 12 covers.
+    - On an earlier run, a stray "right" opened Add someone. Nothing was saved.
+  - UX review (impeccable; detector clean). Fixes applied:
+    - The facts are written as sentences in the serif face ("Mostly X, mostly in the voice of Y").
+    - A "Longest book you finished" highlight with a brass rule. There's no cover, because the server gives the media ID, not the library item.
+    - The current year reads "so far".
+    - Separate empty copy for the current year and past years.
+    - The chosen year chip is underlined in brass rather than filled, so it can't be mistaken for focus.
+    - Light years (under 3 h) get a smaller headline.
+    - Each year is cached per visit.
+    - Retry on error.
+    - Cover shadows have a smaller blur.
+  - Left for later:
+    - Focusable covers.
+    - A month bar strip (the API only gives the busiest month).
+    - A seasonal prompt on Home.
 
 ## Log
+
+- 2026-11-22: The user asked to centre the round profile avatars' initials vertically (Newsreader caps sit high). Fixed in 0.8.1.
 
 - 2026-11-22: Plan written.

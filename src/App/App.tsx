@@ -51,6 +51,7 @@ import Podcasts from '../screens/Podcasts';
 import SeriesDetail from '../screens/SeriesDetail';
 import Search, {presetSearch} from '../screens/Search';
 import Stats from '../screens/Stats';
+import YearReview from '../screens/YearReview';
 import SeriesList from '../screens/SeriesList';
 import SettingsScreen from '../screens/Settings';
 import Setup from '../screens/Setup';
@@ -903,6 +904,7 @@ function App () {
 					onAbout={() => go({name: 'about'}, 'about')}
 					onSignOut={() => signOut('')}
 					onStats={() => go({name: 'stats'}, 'stats')}
+					onYearReview={() => go({name: 'yearReview'}, 'yearReview')}
 					onSpeed={(kind, rate) => {
 						savePlaybackRate(rate, kind);
 						// Apply it now when that kind is loaded.
@@ -911,7 +913,8 @@ function App () {
 					}}
 				/>
 			)}
-			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} />}
+			{route.name === 'stats' && client && <Stats client={client} onDone={() => setStack(pop)} onYearReview={() => go({name: 'yearReview'}, 'year')} />}
+			{route.name === 'yearReview' && client && <YearReview client={client} onDone={() => setStack(pop)} />}
 			{route.name === 'about' && (
 				<About
 					version={appinfo.version}

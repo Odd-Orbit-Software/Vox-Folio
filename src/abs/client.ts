@@ -3,6 +3,7 @@
    issues a new refresh token and invalidates the old one, so refreshes are serialised and every new
    pair is handed to `onTokens` to be saved. */
 
+import type {YearStats} from '../app/yearReview';
 import type {Author, AuthorDetail, Bookmark, FilterData, ListeningStats, Collection, Library, LibraryItem, LoginResponse, MediaProgress, Page, PlaybackSession, Playlist, PodcastEpisode, PodcastSearchResults, SearchResults, Series, Shelf, SyncPayload} from './types';
 
 export type AbsErrorKind = 'network' | 'timeout' | 'auth' | 'notFound' | 'server' | 'badServer';
@@ -383,6 +384,11 @@ export class AbsClient {
 	async listeningStats (): Promise<ListeningStats> {
 		const data = await this.request<ListeningStats>('GET', '/api/me/listening-stats');
 		return {totalTime: data && data.totalTime || 0, days: data && data.days || {}, today: data && data.today || 0};
+	}
+
+	/** Audiobookshelf's summary of one year's listening (Year in Review). */
+	yearStats (year: number): Promise<Partial<YearStats> | null> {
+		return this.request<Partial<YearStats> | null>('GET', '/api/me/stats/year/' + year);
 	}
 
 	/** Mark a book (or a podcast episode) finished, or not, for this listener. */

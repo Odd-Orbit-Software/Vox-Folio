@@ -3105,3 +3105,162 @@
 .vf-home__customise svg {
 	margin-right: 10px;
 }
+
+.vf-stats__done {
+	display: flex;
+}
+
+.vf-stats__done > * + * {
+	margin-left: 20px;
+}
+
+/* ---- Year in review ★ ---------------------------------------------------------------------------- */
+
+.vf-year {
+	padding: 54px 96px;
+	display: flex;
+	box-sizing: border-box;
+	height: 100%;
+}
+
+.vf-year__main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	padding-top: 40px;
+}
+
+.vf-year__years {
+	display: flex;
+	margin-top: 18px;
+}
+
+.vf-year__years > * + * {
+	margin-left: 12px;
+}
+
+/* The year's total is the page: set large, in the book face. */
+.vf-year__headline {
+	margin: 44px 0 0;
+	font: 500 148px/0.95 'Newsreader', serif;
+	letter-spacing: -0.02em;
+}
+
+.vf-year__sub {
+	margin: 10px 0 0;
+	font-size: 28px;
+	color: var(--vf-muted);
+}
+
+.vf-year__headline--light {
+	font-size: 104px;
+}
+
+.vf-year__story {
+	margin-top: 36px;
+	max-width: 900px;
+	font: 400 34px/1.4 'Newsreader', serif;
+	color: var(--vf-muted);
+}
+
+.vf-year__story p {
+	margin: 0 0 10px;
+}
+
+.vf-year__story strong {
+	font-weight: 500;
+	color: var(--vf-paper);
+}
+
+/* The one book that stands for the year. */
+.vf-year__hero {
+	margin-top: 28px;
+	display: flex;
+	align-items: center;
+	font-size: 22px;
+}
+
+.vf-year__herocover {
+	flex: none;
+	margin-right: 28px;
+	border-radius: 10px;
+}
+
+.vf-year__herotitle {
+	margin: 8px 0 4px;
+	font: 500 36px/1.15 'Newsreader', serif;
+	color: var(--vf-paper);
+}
+
+/* Year chips: the chosen year is underlined in brass, so it never looks like the focus. */
+.vf-year__chip {
+	height: 52px;
+	font-size: 24px;
+	font-weight: 500;
+	color: var(--vf-muted);
+}
+
+.vf-year__chip.is-selected:not(:focus) {
+	color: var(--vf-paper);
+	box-shadow: inset 0 -3px 0 var(--vf-brass);
+}
+
+.vf-year__empty .vf-year__headline {
+	font-size: 96px;
+}
+
+.vf-year__empty .vf-message__body {
+	margin-top: 24px;
+	max-width: 760px;
+}
+
+.vf-year__loading {
+	margin-top: 60px;
+	width: 520px;
+}
+
+.vf-year__done {
+	margin-top: auto;
+	padding-top: 32px;
+}
+
+/* A shelf of the year's covers: finished books first. */
+.vf-year__covers {
+	flex: none;
+	width: 804px;
+	margin-left: 64px;
+	align-self: center;
+	display: flex;
+	flex-wrap: wrap;
+	align-content: center;
+}
+
+.vf-year__covers > .vf-year__cover {
+	margin: 0 12px 12px 0;
+	border-radius: 10px;
+	/* A small blur: twelve large soft shadows are costly on the TV's compositor. */
+	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.vf-year__covers--1,
+.vf-year__covers--2,
+.vf-year__covers--3,
+.vf-year__covers--4 {
+	width: 560px;
+}
+
+.vf-year {
+	position: relative;
+}
+
+.vf-year__back {
+	position: absolute;
+	left: 96px;
+	top: 54px;
+}
+
+.vf-year__hero {
+	padding-left: 24px;
+	border-left: 4px solid var(--vf-brass);
+}
