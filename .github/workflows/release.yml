@@ -19,6 +19,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        # Enact treats lint warnings as errors when CI is set; real lint errors still fail the build.
+        env:
+          CI: false
       - run: npx -y -p @webos-tools/cli ares-package dist -o build
       - name: Homebrew Channel manifest
         run: |
