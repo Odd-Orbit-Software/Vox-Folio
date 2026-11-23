@@ -66,3 +66,10 @@ flowchart LR
 Navigation uses Enact Spotlight. Every focusable control is a `Spottable` (`Button` or `Tile` in `src/components/controls.tsx`). Screens are `ScreenContainer`s that restore focus to the element named by the route's `focusKey` when you come back, so Back always lands where you were. Panels are `PanelScope`s that trap focus until closed.
 
 Long lists (covers, chapters, settings) move with a CSS transform rather than scrolling. Focusing an off-screen item would otherwise make the browser scroll the clipping box as well, so `pinScroll` keeps that scroll at zero.
+
+## The Magic Remote
+
+Spotlight already focuses whatever the pointer hovers, and a click is OK. `src/platform/pointer.ts` adds the rest:
+
+- **Wheel.** Each notch becomes a synthetic Up or Down key press (at most one every 140 ms), so every screen's own key handling applies, with no per-screen code. For 400 ms after a step, small pointer movements are ignored, so hover can't pull focus straight back.
+- **Pointer mode.** While the pointer moves, the root carries `vf-pointer`. It's removed on a real key press, after 5 s idle, or when webOS sends `cursorStateChange` with the cursor hidden. Cover rows show edge arrows only in this mode; a click moves focus four tiles along.

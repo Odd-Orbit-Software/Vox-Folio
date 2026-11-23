@@ -36,10 +36,11 @@ Cover and audio URLs can't carry headers, so they take the token as `?token=`. `
 | --- | --- |
 | Server check and version | `GET /ping`, `GET /status` |
 | Libraries, items, pages | `GET /api/libraries`, `/api/libraries/{id}/items`, `/api/items/{id}?expanded=1` |
-| Filters | `GET /api/libraries/{id}/filterdata`, `filter=<group>.<base64 value>` on items |
+| Filters | `GET /api/libraries/{id}/filterdata`, `filter=<group>.<base64 value>` on items. The server takes one filter per request, so a progress state combined with a genre, narrator, tag or language fetches the metadata filter and applies the progress part against the user's own progress (`src/app/filters.ts`) |
 | Home shelves | `GET /api/libraries/{id}/personalized` |
 | In progress and progress | `GET /api/me/items-in-progress`, `GET /api/me`, `GET /api/me/progress/{id}[/{episode}]` |
 | Mark finished | `PATCH /api/me/progress/{id}[/{episode}]` |
+| Mark many finished | `PATCH /api/me/progress/batch/update` with `[{libraryItemId, episodeId?, isFinished}]` |
 | Remove from Continue listening | `GET /api/me/progress/{progressId}/remove-from-continue-listening` |
 | Playback | `POST /api/items/{id}/play[/{episode}]`, `/api/session/{id}/sync`, `/api/session/{id}/close` |
 | Series, authors, collections, playlists | `/api/series/{id}`, `/api/authors/{id}`, `/api/collections/{id}`, `/api/playlists/{id}` |

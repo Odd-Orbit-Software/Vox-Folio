@@ -94,6 +94,18 @@ What the TV and the server taught us, with each cause and its fix.
 
 **Fix.** A watchdog drops the socket after 70 s of silence (the server pings every 25 s). `auth_failed` triggers a token refresh and a fresh `auth`. Returning to the app refreshes the token if needed before reconnecting.
 
+## Picking a filter threw focus out of the panel
+
+**Cause.** When filtered results arrived, the Library screen re-ran its initial focus (`focusDeps`), which moved focus to the grid behind the open panel.
+
+**Fix.** `ScreenContainer` skips its refocus while focus is inside a `.vf-panel`. The filter panel also refocuses the value just picked, since the "Showing" line above the list can appear or disappear.
+
+## Wheel steps undone by hover
+
+**Cause.** A wheel step moved focus, then a pixel of pointer jitter hovered the tile under the cursor and moved it back.
+
+**Fix.** Hover is ignored for 400 ms after a wheel step unless the pointer moves more than 12 px.
+
 ## Left on a setting jumped to the rail
 
 **Cause.** The side rail listens for Left in the capture phase and moves focus to itself from the leftmost element.

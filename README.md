@@ -36,10 +36,10 @@ Vox Folio signs in to your own Audiobookshelf server and keeps your place in ste
 
 - **Listen properly.** Chapters, bookmarks, a sleep timer that fades out gently, and speeds from 0.5× to 2× with the pitch kept natural.
 - **Live sync.** Positions move between devices as they happen, with an undo if you didn't mean it.
-- **Browse the way you think.** Home rows you choose and order, a library with filters, series, authors, collections and search.
+- **Browse the way you think.** Home rows you choose and order, a library with filters you can combine, series, authors, collections and search.
 - **Series and playlists keep going.** The next book or episode starts on its own, with an Up Next card first.
 - **Podcasts.** Shows, new episodes, mark played, and their own playback speed.
-- **Made for a TV.** Every control works with the D-pad, the coloured buttons have a guide, and the screensaver can turn the screen fully black for OLED panels.
+- **Made for a TV.** Every control works with the D-pad or the Magic Remote's pointer and wheel, the coloured buttons have a guide, and the screensaver can turn the screen fully black for OLED panels.
 - **Shared TVs.** Profiles for everyone in the house, each with their own place, settings and Year in Review.
 
 ## Get it

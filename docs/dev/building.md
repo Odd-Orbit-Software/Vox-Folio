@@ -10,10 +10,14 @@ nav_order: 5
 npm install
 npm test           # Jest unit tests
 npm run typecheck
-npm run lint
-npm run build      # production build into dist/, then the ES2019 check
+npm run lint       # project eslint.config.mjs; any warning fails
+npm run build      # lint, production build into dist/, then the ES2019 check
 npm run package    # build, then ares-package into build/
 ```
+
+## Lint
+
+`eslint.config.mjs` uses Enact's rules without `enact/jsx-no-bind` (inline handlers in JSX are fine, and list tiles are memoised). `npm run lint` runs with `--max-warnings 0`, and the build runs it first, then packs with Enact's own lint pass turned off.
 
 ## On a TV
 
