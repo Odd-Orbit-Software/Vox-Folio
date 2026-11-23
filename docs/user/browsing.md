@@ -14,10 +14,12 @@ The side rail holds Home, Search, Library, Series, Authors, Podcasts ★ and Set
 
 Every book in the library, as covers. Sort by **Recently added**, **Title** or **Author**. With more than one book library, the library name at the top switches between them.
 
-**Filter** narrows the list to one thing at a time:
+**Filter** narrows the list by a progress state, by one genre, narrator, tag or language, or by one of each together:
 
 - **Progress:** not started, in progress or finished
 - **Genre, Narrator, Tag, Language:** from your server's own data
+
+Each choice shows how many books it would return. Choices stay in the panel as you pick, so you can add a second one, and a dot marks each tab with something chosen. In long lists, Left and Right jump to the next or previous letter and Channel up and down move a page.
 
 Genres that a metadata source joined into one long string are split into separate genres, and different spellings of a language are merged. While a filter is on, the chip shows it and the count reads, for example, "7 of 181 titles". **Red** on the chip, or in the filter panel, shows all books again. In long lists such as narrators, Channel up and down jump eight at a time.
 

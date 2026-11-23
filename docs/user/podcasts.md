@@ -14,6 +14,7 @@ A show's page lists its episodes, newest first, with the date, length and your p
 
 - **OK** plays an episode.
 - **Red**, or the round button at the end of the row, marks an episode played or unplayed.
+- **Mark all played**, at the top, marks every unplayed episode played. It asks for a second OK first.
 
 Episodes resume and sync like books. Autoplay goes on to the next episode in the order they came out, skipping any you've played. Podcasts have their own speed, separate from books.
 

@@ -3253,12 +3253,19 @@
 	padding-top: 32px;
 }
 
+/* The right column: the year's covers, then its rhythm by month. */
+.vf-year__side {
+	flex: none;
+	margin-left: 64px;
+	align-self: center;
+	display: flex;
+	flex-direction: column;
+}
+
 /* A shelf of the year's covers: finished books first. */
 .vf-year__covers {
 	flex: none;
 	width: 804px;
-	margin-left: 64px;
-	align-self: center;
 	display: flex;
 	flex-wrap: wrap;
 	align-content: center;
@@ -3580,4 +3587,222 @@
 	margin: 16px 0 0;
 	font-size: 22px;
 	color: var(--vf-muted);
+}
+
+/* Year in Review: the month strip. Bars are 24 px, rounded at the top and square at the baseline, with
+   the busiest month in brass. #8C7446 keeps the other months at 3:1 against the ground. */
+.vf-months {
+	margin: 36px 0 32px;
+	display: flex;
+	align-items: flex-end;
+	height: 150px;
+	border-bottom: 1px solid #2A2E36;
+	padding-bottom: 0;
+}
+
+.vf-months__col {
+	width: 44px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-end;
+	height: 100%;
+	position: relative;
+}
+
+.vf-months__bar {
+	width: 24px;
+	border-radius: 4px 4px 0 0;
+	background: #8C7446;
+}
+
+.vf-months__col.is-peak .vf-months__bar {
+	background: var(--vf-brass);
+}
+
+.vf-months__value {
+	margin-bottom: 8px;
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--vf-paper);
+}
+
+.vf-months__label {
+	position: absolute;
+	bottom: -32px;
+	font-size: 20px;
+	color: var(--vf-muted);
+}
+
+.vf-months__col.is-future .vf-months__label {
+	color: var(--vf-faint);
+}
+
+.vf-months + .vf-year__hero {
+	margin-top: 52px;
+}
+
+/* Podcast show: clear a backlog in one go. */
+.vf-show__all {
+	flex: none;
+	align-self: flex-end;
+	margin-left: 32px;
+	white-space: nowrap;
+}
+
+.vf-show__all > svg {
+	margin-right: 10px;
+}
+
+/* Filter panel: counts, empty values, and which tabs have a value set. */
+.vf-filter__count {
+	flex: none;
+	margin-left: 16px;
+	font-size: 24px;
+	color: var(--vf-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.vf-filter__value.is-empty .vf-chapter__title,
+.vf-filter__value.is-empty .vf-filter__count {
+	color: var(--vf-faint);
+}
+
+.vf-filter__showing {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-right: 16px;
+	color: var(--vf-muted);
+}
+
+.vf-filter__current .vf-filter__clear {
+	flex: none;
+}
+
+/* A tab with a value chosen carries a small brass dot. */
+.vf-tab.has-value::after {
+	content: '';
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-left: 8px;
+	border-radius: 4px;
+	background: var(--vf-brass);
+	vertical-align: middle;
+}
+
+/* Row arrows for the Magic Remote's pointer: shown only while the pointer is in use. */
+.vf-crow {
+	position: relative;
+}
+
+.vf-crow__arrow {
+	display: none;
+	position: absolute;
+	top: 56px;
+	z-index: 2;
+	width: 96px;
+	height: 240px;
+	background: linear-gradient(90deg, rgba(15, 17, 21, 0), rgba(15, 17, 21, 0.92) 55%);
+	color: var(--vf-paper);
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.vf-pointer .vf-crow__arrow {
+	display: flex;
+}
+
+.vf-crow__arrow:hover {
+	color: var(--vf-brass);
+}
+
+/* Over the row's ends, where the edge tile is already cut off, on a fade: never over a whole cover. */
+.vf-crow__arrow--left {
+	left: -30px;
+	background: linear-gradient(270deg, rgba(15, 17, 21, 0), rgba(15, 17, 21, 0.92) 55%);
+}
+
+.vf-crow__arrow--right {
+	right: 0;
+}
+
+/* Five filter tabs (one with a dot) fit the panel's width. */
+.vf-filter .vf-tabs > * + * {
+	margin-left: 6px;
+}
+
+.vf-filter .vf-tab {
+	padding-left: 16px;
+	padding-right: 16px;
+}
+
+/* webOS minimum touch target is 75 px at 1080p: the new filter tabs and chips meet it. */
+.vf-filter .vf-tab,
+.vf-show__all,
+.vf-filter__clear {
+	min-height: 76px;
+}
+
+.vf-tab.has-value::after {
+	width: 12px;
+	height: 12px;
+	border-radius: 6px;
+}
+
+.vf-filter__value .vf-filter__count + svg {
+	margin-left: 12px;
+}
+
+/* Month strip: keep its space while the data loads, so the column doesn't jump; past empty months get a tick. */
+.vf-year__side .vf-months {
+	min-height: 150px;
+}
+
+/* A scrolling title fades at both edges, so a word passing out of view never looks cut in half. */
+.vf-marquee.is-scrolling {
+	-webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent);
+}
+
+/* webOS minimum target (75 px at 1080p) for the player's side chips and the episode played checks. */
+.vf-transport__side > .vf-btn--chip {
+	min-height: 76px;
+}
+
+.vf-show__played {
+	width: 80px;
+	height: 80px;
+	border-radius: 40px;
+}
+
+/* ---- Large text, from the TV review ---------------------------------------------------------- */
+
+/* Faint text is real text in places (sort label, counts, notes): lift it to pass 4.5:1. */
+.vf-text-large {
+	--vf-faint: #8C867D;
+}
+
+.vf-text-large .vf-tab {
+	height: 64px;
+	font-size: 28px;
+}
+
+.vf-text-large .vf-panel__foot {
+	font-size: 26px;
+}
+
+.vf-text-large .vf-details__desc {
+	font-size: 28px;
+	-webkit-line-clamp: 4;
+}
+
+.vf-text-large .vf-eyebrow {
+	letter-spacing: 0.08em;
+}
+
+.vf-text-large .vf-player__of {
+	font-size: 36px;
 }

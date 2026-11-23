@@ -12,7 +12,7 @@ nav_order: 8
 
 ![Year in Review](../images/year.jpg)
 
-**Settings → Year in review** (or the button on the stats page) sums up a year: total hours and a weekly average, your most-listened author and narrator, top genres, books finished, your busiest month, the longest book you finished, and the covers of the year. OK on a cover opens that book. Chips at the top switch between this year and the two before.
+**Settings → Year in review** (or the button on the stats page) sums up a year: total hours and a weekly average, your most-listened author and narrator, top genres, books finished, your busiest month, the longest book you finished, the covers of the year, and a bar for each month. OK on a cover opens that book. Chips at the top switch between this year and the two before.
 
 From 1 December to 15 January, Home offers the review too.
 

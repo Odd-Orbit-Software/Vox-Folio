@@ -615,7 +615,7 @@ export default function Player ({engine, player, autoplay, queueLabel, queue, on
 						{preview !== null
 							? 'Go to ' + formatClock(preview) + (previewChapter ? ' · ' + previewChapter.title : '') + ' · OK to jump, Back to cancel'
 							: chapter
-								? 'Chapter ' + (p.chapterIndex + 1) + ' · ' + formatClock(p.position - chapter.start) + ' / ' + formatClock(chapter.end - chapter.start)
+								? chapter.title + ' · ' + formatClock(p.position - chapter.start) + ' / ' + formatClock(chapter.end - chapter.start)
 								: ''}
 					</span>
 					<span>{Math.floor(percent) + (p.episodeId ? '% of episode' : '% of book')}</span>

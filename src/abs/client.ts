@@ -400,6 +400,15 @@ export class AbsClient {
 		return this.request<Partial<YearStats> | null>('GET', '/api/me/stats/year/' + year);
 	}
 
+	/** Mark several books or episodes finished (or not) in one request. */
+	setFinishedMany (entries: {itemId: string; episodeId?: string | null}[], isFinished: boolean): Promise<void> {
+		return this.request<void>('PATCH', '/api/me/progress/batch/update', entries.map((e) => ({
+			libraryItemId: e.itemId,
+			...(e.episodeId ? {episodeId: e.episodeId} : {}),
+			isFinished
+		})));
+	}
+
 	/** Mark a book (or a podcast episode) finished, or not, for this listener. */
 	setFinished (itemId: string, isFinished: boolean, episodeId?: string | null): Promise<void> {
 		return this.request<void>('PATCH', '/api/me/progress/' + encodeURIComponent(itemId) + episodePath(episodeId), {isFinished});

@@ -3,6 +3,15 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.11.0
+
+- **Magic Remote.** The wheel moves between rows and lists. While you're using the pointer, arrows at the ends of each row move it along.
+- **Library filters combine.** Pick a progress state together with a genre, narrator, tag or language, for example In progress and Adventure. Each choice shows how many books it would return. In long lists, Left and Right jump to the next letter.
+- **Mark all played** on a podcast's page clears a backlog in one go, after a second OK.
+- **Year in Review** shows your listening month by month.
+- **Large text** goes further: panel tabs, the Details synopsis and faint labels are bigger or clearer.
+- The player's side buttons and the podcast played checks are larger, scrolling titles fade at their edges, and the progress bar names the chapter by its title.
+
 ## 0.10.2
 
 - **Saved sign-ins are encrypted.** Each profile's sign-in tokens are encrypted on the TV, with a key that's generated there and can't be read back out. Existing sign-ins move across on first launch, and nobody has to sign in again. Diagnostics shows whether encryption is active.

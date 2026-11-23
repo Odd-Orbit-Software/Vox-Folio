@@ -11,9 +11,10 @@ VER=$(python3 -I -c 'import json;print(json.load(open("webos-meta/appinfo.json")
 IPK="build/${ID}_${VER}_all.ipk"
 [ -f "$IPK" ] || { echo "Missing $IPK; build and package first"; exit 1; }
 HASH=$(sha256sum "$IPK" | cut -d' ' -f1)
-python3 -I - "$ID" "$VER" "$URL" "$HASH" > "build/${ID}.manifest.json" <<'PY'
+SIZE=$(stat -c %s "$IPK")
+python3 -I - "$ID" "$VER" "$URL" "$HASH" "$SIZE" > "build/${ID}.manifest.json" <<'PY'
 import json, sys
-app_id, version, url, sha = sys.argv[1:5]
+app_id, version, url, sha, size = sys.argv[1:6]
 print(json.dumps({
     "id": app_id,
     "version": version,
@@ -24,6 +25,7 @@ print(json.dumps({
     "sourceUrl": "https://github.com/Odd-Orbit-Software/Vox-Folio",
     "rootRequired": False,
     "ipkUrl": url,
+    "ipkSize": int(size),
     "ipkHash": {"sha256": sha},
 }, indent=2))
 PY

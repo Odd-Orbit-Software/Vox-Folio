@@ -6,7 +6,7 @@ import {episodeLength, episodeState, episodeTitle, plainText} from '../app/podca
 import {Button, Cover, Icon, Tile} from '../components/controls';
 import {ErrorPanel} from '../components/ErrorPanel';
 import {Marquee} from '../components/marquee';
-import {pinScroll, ScreenContainer} from '../components/ScreenContainer';
+import {focusWithin, pinScroll, ScreenContainer} from '../components/ScreenContainer';
 import {Keys} from '../platform/webos';
 import type {PlayerState} from '../player/engine';
 
@@ -78,6 +78,32 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 		});
 	};
 
+	/* Mark every unplayed episode played, for clearing a backlog. It changes many at once, so it asks for
+	   a second OK first. */
+	const [confirmAll, setConfirmAll] = useState(false);
+	const [chipFocused, setChipFocused] = useState(false);
+	const markAllPlayed = () => {
+		if (load.state !== 'ready' || busy) return;
+		const unplayed = load.episodes.filter((e) => !episodeState(e, load.progress).finished);
+		if (!unplayed.length) return;
+		if (!confirmAll) {
+			setConfirmAll(true);
+			return;
+		}
+		setConfirmAll(false);
+		setBusy('all');
+		client.setFinishedMany(unplayed.map((e) => ({itemId, episodeId: e.id})), true).then(() => client.progressByItem()).then((progress) => {
+			setBusy(null);
+			// The chip goes once nothing is left unplayed: hand focus to the first episode first.
+			focusWithin('podcast-show', 'ep:' + itemId + '/' + load.episodes[0].id);
+			setLoad((l) => (l.state === 'ready' ? {...l, progress} : l));
+			onToast(unplayed.length === 1 ? 'Marked 1 episode played' : 'Marked ' + unplayed.length + ' episodes played');
+		}, () => {
+			setBusy(null);
+			onToast("Couldn't mark the episodes played");
+		});
+	};
+
 	const ready = load.state === 'ready' ? load : null;
 	const md = ready ? ready.show.media.metadata : null;
 	const episodes = ready ? ready.episodes : [];
@@ -85,12 +111,13 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 	const focused = episodes[focusRow];
 	const episodeAbout = focused ? plainText(focused.description) : '';
 	const description = episodeAbout || (md ? plainText(md.description) : '');
+	const unplayedCount = ready ? ready.episodes.filter((e) => !episodeState(e, ready.progress).finished).length : 0;
 	const focusedPlayed = Boolean(ready && focused && episodeState(focused, ready.progress).finished);
 
 	return (
 		<ScreenContainer id="podcast-show" className="vf-series vf-show" restoreKey={restoreKey} focusDeps={[load.state]}>
 			<div className="vf-hint vf-series__back"><Icon name="back" size={24} />Back</div>
-			{focused && (
+			{focused && !chipFocused && (
 				<div className="vf-hint vf-show__hint" aria-hidden="true">
 					<span className="vf-dot vf-dot--red" />{focusedPlayed ? 'Mark unplayed' : 'Mark played'}
 				</div>
@@ -102,6 +129,23 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 					<h1 className="vf-series__title">{md ? md.title : title}</h1>
 					{description && <p className="vf-show__desc">{description}</p>}
 				</div>
+				{ready && unplayedCount > 0 && (
+					<Button
+						variant="chip"
+						className="vf-show__all"
+						data-focus-key="mark-all"
+						aria-busy={busy === 'all'}
+						onFocus={() => setChipFocused(true)}
+						onBlur={() => {
+							setConfirmAll(false);
+							setChipFocused(false);
+						}}
+						onClick={markAllPlayed}
+					>
+						<Icon name="check" size={22} />
+						{busy === 'all' ? 'Marking ' + unplayedCount + '…' : confirmAll ? 'OK again: mark ' + unplayedCount + ' played' : 'Mark all played'}
+					</Button>
+				)}
 			</header>
 
 			{load.state === 'error' && (

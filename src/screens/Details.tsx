@@ -86,7 +86,8 @@ export default function Details ({client, itemId, player, autoplay, restoreKey, 
 	const position = progress && !finished ? progress.currentTime : 0;
 	const started = position > 0;
 	const isCurrent = player.itemId === itemId && player.status !== 'error';
-	const percent = isCurrent && player.duration ? Math.round(player.position / player.duration * 100) : progress ? Math.round(progress.progress * 100) : 0;
+	// Floored, as the player shows it, so the two never disagree.
+	const percent = isCurrent && player.duration ? Math.floor(player.position / player.duration * 100) : progress ? Math.floor(progress.progress * 100) : 0;
 	const chapters = item ? item.media.numChapters : 0;
 	const description = md ? ((md as {descriptionPlain?: string}).descriptionPlain || md.description || '') : '';
 

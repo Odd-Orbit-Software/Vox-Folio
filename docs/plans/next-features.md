@@ -330,6 +330,54 @@ The user is using the TV: **ask before any TV test**, and batch the tests so you
 - The Weekend queue is active again on claude-test-2.
 - The other two accounts' saved Homes shrink the next time they open Home (537 KB for 3 at test time).
 
+## Batch 4 (agreed 2026-11-23)
+
+**Ask before any TV test.** For each item: build it, run the impeccable review and fix what it finds. Then do one TV session, which also covers a full UI/UX review with Large text on.
+
+| # | Item | Status |
+| --- | --- | --- |
+| K1 | Lint: project `eslint.config.mjs` (Enact rules without jsx-no-bind), zero warnings, `--max-warnings 0`, build runs lint then `enact pack --no-linting`, CI no longer needs `CI: false` | done (6237f91) |
+| K2 | Magic Remote: wheel scrolling in rows, grids and lists; pointer arrows at row edges | done (0.11.0) |
+| K3 | Year in Review: month-by-month strip, from `/api/me/listening-stats` `days` | done (0.11.0) |
+| K4 | Podcasts: mark many episodes played at once | done (0.11.0) |
+| K5 | Filters: combine progress with one metadata filter, counts per value, A–Z jump | done (0.11.0) |
+| M | Mockups: https://claude.ai/artifact/4t9wDBgo5QmDibBJA5oNPS (A genre shelves, B narrator portraits + A–Z rail, C playlist mosaic + Green Details, D Home sliver fix with top-bar chip). Awaiting the user's choice | done |
+| H | Homebrew Channel: `tools/webosbrew-package.yml` drafted (pool main), manifest now has ipkSize. The user needs to decide on a licence (main pool needs one in the repo), then open a PR to webosbrew/apps-repo | drafted |
+
+### Batch 4 notes
+- **K2 Magic Remote.** `platform/pointer.ts`:
+  - Each wheel notch is a synthetic Up/Down press, at most one every 140 ms.
+  - Hover is held off for 400 ms after a step.
+  - `vf-pointer` is set while the pointer is in use, and cleared on idle (5 s), on `cursorStateChange`, or on a real key press.
+  - `CoverRow` adds edge arrows (on a fade, over the clipped end tile). Clicking one moves focus 4 tiles along.
+- **K3 Year in Review.** `monthsOfYear()` from listening-stats days. `MonthStrip` sits under the covers; the peak month is brass and the other months are #8C7446 (validated at 3:1).
+- **K4 Podcasts.** `client.setFinishedMany` uses `PATCH /api/me/progress/batch/update`.
+  - "Mark all played" needs a second OK and shows "Marking N…" while it runs.
+  - Focus moves to the first episode before the chip goes.
+- **K5 Library filters.** A `Filters` type holds `{progress, meta}`.
+  - A combined filter fetches the meta value fully and applies progress client-side.
+  - Counts come from `allItems`, which is loaded only when the panel is open and the library has 2000 books or fewer.
+  - Zero values are dimmed and kept.
+  - `letterOf` folds diacritics.
+  - Fixed: `ScreenContainer` no longer refocuses while a `.vf-panel` has focus, which used to steal focus from the panel.
+- **K1 Lint.** Done earlier (6237f91).
+- **TV session (user OK).**
+  - Every feature checked on the TV.
+  - Large text reviewed on the TV with an impeccable agent, and these fixes applied:
+    - a faint colour that passes contrast
+    - bigger tabs and panel footer
+    - a 4-line synopsis
+    - edge fades on scrolling titles
+    - side chips and played checks at 76/80 px
+    - chapter title in the scrub meta
+    - floored percentages
+  - Two-line tile titles were left out, because rows have fixed pitch.
+  - Test slips. A remembered picker made two runs land on the wrong profile:
+    - claude-test, where nothing changed
+    - pmck, where Large text was turned on and then turned back off
+  - `scratchpad/c2run.sh` now checks which profile is focused first.
+- **Plaintext tokens on the TV.** WAM's leveldb data files hold none (compacted at 13:09). The two MANIFEST matches belong to Crunchyroll. Nothing to clean.
+
 ## Log
 
 - 2026-11-22: The user asked to centre the round profile avatars' initials vertically (Newsreader caps sit high). Fixed in 0.8.1.

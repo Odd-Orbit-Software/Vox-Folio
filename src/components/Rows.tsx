@@ -4,7 +4,7 @@ import type {FocusEvent, KeyboardEvent, ReactNode} from 'react';
 
 import {Keys} from '../platform/webos';
 
-import {Cover, Tile} from './controls';
+import {Cover, Icon, Tile} from './controls';
 import {Marquee} from './marquee';
 import type {GridItem} from './CoverGrid';
 import {pinScroll} from './ScreenContainer';
@@ -31,6 +31,18 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus, action}: 
 	const maxOffset = Math.max(0, items.length - VISIBLE) * ITEM_PITCH;
 	const offset = Math.min(maxOffset, Math.max(0, index - (VISIBLE - 2)) * ITEM_PITCH);
 
+	/** Move focus a screenful along the row; the row follows focus as usual. */
+	const page = (ev: {currentTarget: HTMLElement}, dir: 1 | -1) => {
+		const next = Math.max(0, Math.min(items.length - 1, index + dir * (VISIBLE - 1)));
+		const row = ev.currentTarget.closest('.vf-crow');
+		const target = row ? row.querySelectorAll('.vf-crow__tile')[next] as HTMLElement | undefined : undefined;
+		setIndex(next);
+		// After the click settles (it blurs whatever had focus), focus the tile the row moved to.
+		window.setTimeout(() => {
+			if (target && !Spotlight.focus(target as unknown as string)) target.focus();
+		}, 0);
+	};
+
 	return (
 		<section className="vf-crow" data-vrow aria-label={title}>
 			<h2 className="vf-crow__title">
@@ -38,6 +50,17 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus, action}: 
 				{meta && <span className="vf-crow__meta">{meta}</span>}
 				{action && <span className="vf-crow__action" aria-hidden="true"><span className="vf-dot vf-dot--red" />{action.label}</span>}
 			</h2>
+			{/* With the pointer, arrows at either end move along the row (the wheel moves between rows). */}
+			{offset > 0 && (
+				<div className="vf-crow__arrow vf-crow__arrow--left" aria-hidden="true" onClick={(ev) => page(ev, -1)}>
+					<Icon name="chevronLeft" size={40} />
+				</div>
+			)}
+			{offset < maxOffset && (
+				<div className="vf-crow__arrow vf-crow__arrow--right" aria-hidden="true" onClick={(ev) => page(ev, 1)}>
+					<Icon name="chevronRight" size={40} />
+				</div>
+			)}
 			<div className="vf-crow__viewport" onScroll={pinScroll}>
 				<div className="vf-crow__track" style={{transform: 'translateX(' + -offset + 'px)'}}>
 					{items.map((item, i) => (

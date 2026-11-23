@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
-import {normaliseYearStats, summariseYear} from '../app/yearReview';
+import {monthsOfYear, normaliseYearStats, summariseYear} from '../app/yearReview';
 import type {YearSummary} from '../app/yearReview';
 import {Button, Cover, Icon, Tile} from '../components/controls';
 import {errorTitle} from '../components/ErrorPanel';
@@ -24,6 +24,33 @@ const cache = new WeakMap<AbsClient, {year: number; years: Record<number, YearSu
 function listText (items: string[]): string {
 	if (items.length < 2) return items.join('');
 	return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+
+const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function hoursLabel (seconds: number): string {
+	return seconds >= 3600 ? Math.round(seconds / 3600) + 'h' : Math.round(seconds / 60) + 'm';
+}
+
+/** The year's rhythm: one bar per month, the busiest in brass with its total. Months still to come
+    are left empty. Single series, so no legend; the label reads the values out. */
+function MonthStrip ({months, upTo}: {months: number[]; upTo: number}) {
+	const peak = Math.max(...months);
+	if (peak <= 0) return null;
+	const busiest = months.indexOf(peak);
+	const label = 'Listening by month: ' + months.slice(0, upTo + 1).map((v, i) => MONTH_NAMES[i] + ' ' + hoursLabel(v)).join(', ');
+	return (
+		<figure className="vf-months" aria-label={label}>
+			{months.map((v, i) => (
+				<div key={i} className={'vf-months__col' + (i === busiest ? ' is-peak' : '') + (i > upTo ? ' is-future' : '')}>
+					<span className="vf-months__value">{i === busiest ? hoursLabel(v) : ''}</span>
+					<span className="vf-months__bar" style={{height: v > 0 ? Math.max(4, Math.round((v / peak) * 88)) + 'px' : '0px'}} />
+					<span className="vf-months__label">{MONTH_INITIALS[i]}</span>
+				</div>
+			))}
+		</figure>
+	);
 }
 
 /** This year and the two before it. */
@@ -57,6 +84,18 @@ export default function YearReview ({client, onDone, initialYear, onOpenTitle, r
 	useEffect(() => {
 		cache.set(client, {year, years});
 	}, [client, year, years]);
+
+	// Seconds per day across all years, for the month strip (one fetch per visit).
+	const [days, setDays] = useState<Record<string, number> | null>(null);
+	useEffect(() => {
+		let cancelled = false;
+		client.listeningStats().then((st) => {
+			if (!cancelled) setDays(st.days);
+		}, () => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, [client]);
 
 	const s = years[year] || null;
 	const loading = !s && !error;
@@ -121,7 +160,7 @@ export default function YearReview ({client, onDone, initialYear, onOpenTitle, r
 								</p>
 							)}
 							<p>
-								<strong>{s.booksFinished + (s.booksFinished === 1 ? ' book' : ' books')}</strong>{' finished, of ' + s.booksListened + ' you listened to'}
+								<strong>{s.booksFinished + (s.booksFinished === 1 ? ' book' : ' books')}</strong>{s.booksListened > s.booksFinished ? ' finished, of ' + s.booksListened + ' you listened to' : ' finished'}
 								{s.busiestMonth ? <>{'. Your busiest month was '}<strong>{s.busiestMonth}</strong></> : null}
 								{'.'}
 							</p>
@@ -146,13 +185,18 @@ export default function YearReview ({client, onDone, initialYear, onOpenTitle, r
 				</div>
 			</div>
 
-			{s && s.covers.length > 0 && (
-				<div className={'vf-year__covers vf-year__covers--' + Math.min(12, s.covers.length)} aria-label={'Covers of what you listened to in ' + year}>
-					{s.covers.map((id) => (
-						<Tile key={id} className="vf-year__cover" data-focus-key={'cover:' + id} aria-label="Open this book" onClick={() => onOpenTitle(id, 'cover:' + id)}>
-							<Cover url={client.coverUrl(id, 360)} title="" size={s.covers.length > 4 ? 180 : 260} />
-						</Tile>
-					))}
+			{s && !s.empty && (
+				<div className="vf-year__side">
+					{s.covers.length > 0 && (
+						<div className={'vf-year__covers vf-year__covers--' + Math.min(12, s.covers.length)} aria-label={'Covers of what you listened to in ' + year}>
+							{s.covers.map((id) => (
+								<Tile key={id} className="vf-year__cover" data-focus-key={'cover:' + id} aria-label="Open this book" onClick={() => onOpenTitle(id, 'cover:' + id)}>
+									<Cover url={client.coverUrl(id, 360)} title="" size={s.covers.length > 4 ? 180 : 260} />
+								</Tile>
+							))}
+						</div>
+					)}
+					{days && <MonthStrip months={monthsOfYear(year, days)} upTo={current ? now.getMonth() : 11} />}
 				</div>
 			)}
 		</ScreenContainer>

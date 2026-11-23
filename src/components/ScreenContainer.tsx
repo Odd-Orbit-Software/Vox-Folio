@@ -42,7 +42,12 @@ interface ScreenProps {
 /** One screen. Focus lands on `[data-default-focus]` (or `restoreKey`) when it opens. */
 export function ScreenContainer ({id, className = '', restoreKey, focusDeps = [], children}: ScreenProps) {
 	useEffect(() => {
-		const t = window.setTimeout(() => focusWithin(id, restoreKey), 0);
+		const t = window.setTimeout(() => {
+			// A panel open over the screen keeps focus; new content behind it mustn't take it away.
+			const active = document.activeElement;
+			if (active && active.closest('.vf-panel')) return;
+			focusWithin(id, restoreKey);
+		}, 0);
 		return () => window.clearTimeout(t);
 	}, focusDeps); // eslint-disable-line react-hooks/exhaustive-deps
 

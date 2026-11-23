@@ -151,3 +151,15 @@ export function dismissYearPrompt (userId: string, year: number): void {
 export function snoozeYearPrompt (userId: string, now: Date): void {
 	writePrompt(userId, {...readPrompt(userId), snoozedUntil: now.getTime() + SNOOZE_MS});
 }
+
+/** Seconds listened in each month of `year`, from the per-day listening stats (keyed YYYY-MM-DD). */
+export function monthsOfYear (year: number, days: Record<string, number>): number[] {
+	const out = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+	const prefix = year + '-';
+	Object.keys(days).forEach((k) => {
+		if (k.indexOf(prefix) !== 0) return;
+		const m = Number(k.slice(5, 7)) - 1;
+		if (m >= 0 && m < 12) out[m] += days[k] || 0;
+	});
+	return out;
+}

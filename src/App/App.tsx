@@ -40,6 +40,7 @@ import BookList from '../screens/BookList';
 import Collections from '../screens/Collections';
 import {LiveSocket} from '../abs/socket';
 import {vaultFlush} from '../platform/vault';
+import {installPointer} from '../platform/pointer';
 import {publishProgress, setLiveStatus} from '../app/live';
 import {loadQueue, nextInQueue, queueIndex, saveQueue} from '../app/queue';
 import type {Queue} from '../app/queue';
@@ -573,6 +574,9 @@ function App () {
 		openBook(current.engine, startKey, {fromKey, keepQueue: true});
 		setQueue({...q, userId: current.client.credentials.userId});
 	}, [openBook]);
+
+	// The Magic Remote's wheel moves focus like the arrows; pointer-only controls show while it's in use.
+	useEffect(() => installPointer(), []);
 
 	// Text size and Reduce motion apply app-wide, as classes on the root.
 	useEffect(() => {

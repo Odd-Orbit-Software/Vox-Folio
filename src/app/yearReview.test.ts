@@ -1,4 +1,4 @@
-import {dismissYearPrompt, normaliseYearStats, snoozeYearPrompt, summariseYear, tidyGenres, yearToPrompt} from './yearReview';
+import {monthsOfYear, dismissYearPrompt, normaliseYearStats, snoozeYearPrompt, summariseYear, tidyGenres, yearToPrompt} from './yearReview';
 
 const raw = {
 	totalListeningSessions: 40, totalListeningTime: 94 * 3600, totalBookListeningTime: 80 * 3600, totalPodcastListeningTime: 14 * 3600,
@@ -57,4 +57,11 @@ describe('the Home prompt', () => {
 		expect(yearToPrompt(new Date(2026, 11, 6), 'c')).toBeNull();
 		expect(yearToPrompt(new Date(2026, 11, 11), 'c')).toBe(2026);
 	});
+});
+
+test('totals each month of the year from the daily stats', () => {
+	const m = monthsOfYear(2026, {'2026-01-03': 600, '2026-01-20': 300, '2026-11-01': 3600, '2025-11-01': 999, 'bad': 5});
+	expect(m[0]).toBe(900);
+	expect(m[10]).toBe(3600);
+	expect(m.reduce((a, b) => a + b, 0)).toBe(4500);
 });
