@@ -16,7 +16,7 @@ Vox Folio plays your [Audiobookshelf](https://www.audiobookshelf.org) library on
 
 ## Downloads
 
-- [Releases](https://github.com/pmck91/Vox-Folio/releases) carry an `.ipk` and a Homebrew Channel manifest.
-- [The latest CI build](https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml) has an `.ipk` attached to every run.
+- [Releases](https://github.com/Odd-Orbit-Software/Vox-Folio/releases) carry an `.ipk` and a Homebrew Channel manifest.
+- [The latest CI build](https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml) has an `.ipk` attached to every run.
 
 Vox Folio is made by [Odd Orbit Software](https://oddorbit.software).

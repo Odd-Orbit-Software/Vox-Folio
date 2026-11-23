@@ -14,7 +14,7 @@ has_children: true
 
 ## Install
 
-**From a release.** Download the `.ipk` from [Releases](https://github.com/pmck91/Vox-Folio/releases) and install it with the webOS CLI:
+**From a release.** Download the `.ipk` from [Releases](https://github.com/Odd-Orbit-Software/Vox-Folio/releases) and install it with the webOS CLI:
 
 ```sh
 ares-install --device <your-tv> software.oddorbit.voxfolio_<version>_all.ipk
@@ -22,7 +22,7 @@ ares-install --device <your-tv> software.oddorbit.voxfolio_<version>_all.ipk
 
 **With the Homebrew Channel.** Each release includes a manifest file. Add the release to a Homebrew Channel repository you use, and Vox Folio appears in the channel's list.
 
-**Latest development build.** Every [CI run](https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml) attaches the `.ipk` it built.
+**Latest development build.** Every [CI run](https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml) attaches the `.ipk` it built.
 
 ## Sign in
 

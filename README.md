@@ -10,15 +10,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml"><img src="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml/badge.svg" alt="Latest build"></a>
-  <a href="https://github.com/pmck91/Vox-Folio/releases/latest"><img src="https://img.shields.io/github/v/release/pmck91/Vox-Folio?label=release" alt="Latest release"></a>
-  <a href="https://pmck91.github.io/Vox-Folio/"><img src="https://img.shields.io/badge/docs-read-F2B84B" alt="Documentation"></a>
+  <a href="https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml"><img src="https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml/badge.svg" alt="Latest build"></a>
+  <a href="https://github.com/Odd-Orbit-Software/Vox-Folio/releases/latest"><img src="https://img.shields.io/github/v/release/Odd-Orbit-Software/Vox-Folio?label=release" alt="Latest release"></a>
+  <a href="https://odd-orbit-software.github.io/Vox-Folio/"><img src="https://img.shields.io/badge/docs-read-F2B84B" alt="Documentation"></a>
 </p>
 
 <p align="center">
-  <a href="https://pmck91.github.io/Vox-Folio/"><b>Documentation</b></a> ·
-  <a href="https://github.com/pmck91/Vox-Folio/releases"><b>Releases</b></a> ·
-  <a href="https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml"><b>Latest CI build</b></a>
+  <a href="https://odd-orbit-software.github.io/Vox-Folio/"><b>Documentation</b></a> ·
+  <a href="https://github.com/Odd-Orbit-Software/Vox-Folio/releases"><b>Releases</b></a> ·
+  <a href="https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml"><b>Latest CI build</b></a>
 </p>
 
 ![Home](docs/images/home.jpg)
@@ -44,7 +44,7 @@ Vox Folio signs in to your own Audiobookshelf server and keeps your place in ste
 
 ## Get it
 
-Download the latest `.ipk` from [Releases](https://github.com/pmck91/Vox-Folio/releases), or every build from [CI](https://github.com/pmck91/Vox-Folio/actions/workflows/build.yml), and install it on a TV in Developer Mode or with the Homebrew Channel. The [installation guide](https://pmck91.github.io/Vox-Folio/user/) has the steps.
+Download the latest `.ipk` from [Releases](https://github.com/Odd-Orbit-Software/Vox-Folio/releases), or every build from [CI](https://github.com/Odd-Orbit-Software/Vox-Folio/actions/workflows/build.yml), and install it on a TV in Developer Mode or with the Homebrew Channel. The [installation guide](https://odd-orbit-software.github.io/Vox-Folio/user/) has the steps.
 
 You'll need your own [Audiobookshelf](https://www.audiobookshelf.org) server. Vox Folio is tested with 2.37, and tells you if a server is too old.
 
@@ -57,7 +57,7 @@ npm run build      # production build into dist/, then the Chromium 79 syntax ch
 npm run package    # build/…ipk
 ```
 
-How it fits together, the webOS quirks and how they were solved are in the [developer guide](https://pmck91.github.io/Vox-Folio/dev/).
+How it fits together, the webOS quirks and how they were solved are in the [developer guide](https://odd-orbit-software.github.io/Vox-Folio/dev/).
 
 ---
 
