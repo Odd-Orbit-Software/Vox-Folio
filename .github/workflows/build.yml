@@ -19,10 +19,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       # Production build, then the Chromium 79 (ES2019) syntax check.
+      # Lints (any warning fails), builds without Enact's own lint pass, then runs the ES2019 check.
       - run: npm run build
-        # Enact treats lint warnings as errors when CI is set; real lint errors still fail the build.
-        env:
-          CI: false
       - name: Package the IPK
         run: npx -y -p @webos-tools/cli ares-package dist -o build
       - uses: actions/upload-artifact@v4

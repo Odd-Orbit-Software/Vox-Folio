@@ -20,14 +20,14 @@ const LEGACY_CREDS_KEY = 'voxfolio.credentials.v1';
 
 /* Profiles carry sign-in tokens, so they're kept in the encrypted vault (platform/vault.ts), which
    falls back to plain localStorage only where the TV lacks Web Crypto. */
-const store = {
+const secretStore = {
 	getItem: vaultGet,
 	setItem: (name: string, value: string) => vaultSet(name, value),
 	removeItem: (name: string) => vaultSet(name, null)
 };
 
-function storage (): typeof store | null {
-	return typeof window === 'undefined' ? null : store;
+function storage (): typeof secretStore | null {
+	return typeof window === 'undefined' ? null : secretStore;
 }
 
 function newId (): string {

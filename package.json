@@ -11,11 +11,11 @@
     "pack": "enact pack",
     "pack-p": "enact pack -p",
     "clean": "enact clean",
-    "lint": "enact lint .",
+    "lint": "enact lint --local . -- --max-warnings 0",
     "test": "enact test",
     "typecheck": "tsc --noEmit",
     "check-es": "node tools/check-es.mjs dist",
-    "build": "enact pack -p && node tools/check-es.mjs dist",
+    "build": "npm run lint && enact pack -p --no-linting && node tools/check-es.mjs dist",
     "package": "npm run build && ares-package dist -o build"
   },
   "enact": {

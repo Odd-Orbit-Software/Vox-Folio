@@ -116,7 +116,7 @@ describe('AbsClient', () => {
 	});
 
 	it('reads the expiry from an access token', () => {
-		const payload = window.btoa(JSON.stringify({exp: 2000000000})).replace(/=+$/, '');
+		const payload = window.btoa(JSON.stringify({exp: 2000000000})).replace(/[=]+$/, '');
 		expect(tokenExpiry('h.' + payload + '.s')).toBe(2000000000 * 1000);
 		expect(tokenExpiry('not-a-jwt')).toBeNull();
 	});
@@ -124,7 +124,7 @@ describe('AbsClient', () => {
 	it('refreshes five minutes before the token expires when kept fresh', async () => {
 		jest.useFakeTimers({now: 1_000_000_000_000});
 		const exp = Math.floor((1_000_000_000_000 + 60 * 60 * 1000) / 1000);
-		const access = 'h.' + window.btoa(JSON.stringify({exp})).replace(/=+$/, '') + '.s';
+		const access = 'h.' + window.btoa(JSON.stringify({exp})).replace(/[=]+$/, '') + '.s';
 		let refreshes = 0;
 		global.fetch = jest.fn(() => {
 			refreshes += 1;
