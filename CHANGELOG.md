@@ -3,6 +3,24 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.12.0
+
+**New ways to browse the library**
+- **Library tabs:** Books, Genres, Narrators and Collections. Filter and Sort sit on their own line under the title in Books.
+- **Genres:** a shelf for each genre, busiest first. The **All N** tile at the end of a long shelf opens every book in that genre.
+- **Narrators:** portraits from A to Z, with a letter rail. Channel up and down jump between letters.
+- **Back returns to where you were** in either view.
+
+**Playlists**
+- Tiles show four covers once a playlist has four or more entries.
+- **Green** on an entry opens its details, or its show for a podcast episode.
+
+**Home**
+- Scrolling down no longer leaves a sliver of the main card. Its book stays one press of Up away, as a small button at the top.
+
+**Fixes**
+- Progress percentages round the same way everywhere, so a book never shows two different numbers.
+
 ## 0.11.0
 
 - **Magic Remote.** The wheel moves between rows and lists. While you're using the pointer, arrows at the ends of each row move it along.

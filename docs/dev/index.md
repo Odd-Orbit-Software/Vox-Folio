@@ -67,6 +67,10 @@ Navigation uses Enact Spotlight. Every focusable control is a `Spottable` (`Butt
 
 Long lists (covers, chapters, settings) move with a CSS transform rather than scrolling. Focusing an off-screen item would otherwise make the browser scroll the clipping box as well, so `pinScroll` keeps that scroll at zero.
 
+## Library views
+
+`src/components/LibraryViews.tsx` builds the By genre and By narrator views from the whole library (fetched once, up to 2,000 books, the same list the filter counts use). Genre shelves are windowed: only shelves within three of the focused one render, the rest are spacers of the same height, so 70 genres stay light on the TV. The narrator grid uses `CoverGrid`'s `jumpTo` to move its window to a row that isn't rendered yet, then focus a tile there.
+
 ## The Magic Remote
 
 Spotlight already focuses whatever the pointer hovers, and a click is OK. `src/platform/pointer.ts` adds the rest:

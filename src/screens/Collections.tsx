@@ -18,8 +18,11 @@ interface CollectionsProps {
 
 function tile (client: AbsClient, key: string, name: string, books: LibraryItem[], kind: string): GridItem {
 	const first = books[0];
+	// A playlist of four or more shows its first four covers; anything else, its first.
+	const withCovers = books.filter((b) => b.media.coverPath);
 	return {
 		key,
+		mosaic: kind === 'Playlist' && withCovers.length >= 4 ? withCovers.slice(0, 4).map((b) => client.coverUrl(b.id, 240)) : undefined,
 		coverUrl: first && first.media.coverPath ? client.coverUrl(first.id, 480) : '',
 		title: name,
 		subtitle: kind + ' · ' + books.length + (books.length === 1 ? ' book' : ' books'),

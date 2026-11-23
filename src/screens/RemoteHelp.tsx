@@ -31,7 +31,9 @@ const GROUPS: {title: string; rows: [Key, string][]}[] = [
 		['red', 'Home, In progress: remove from Continue listening. Red again soon after undoes it'],
 		['red', 'A podcast\u2019s episodes: mark played or unplayed'],
 		['red', 'Library filter: show all books again'],
+		['green', 'A playlist: the focused entry\u2019s details'],
 		['ch', 'Chapters, playlists and filter lists: jump eight at a time'],
+		['ch', 'Library, by narrator: next or previous letter'],
 		['ch', 'Settings, Home rows: move a row up or down']
 	]}
 ];

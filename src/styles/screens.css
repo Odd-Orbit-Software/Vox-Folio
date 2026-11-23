@@ -3806,3 +3806,103 @@
 .vf-text-large .vf-player__of {
 	font-size: 36px;
 }
+
+/* Home: rows passing under the top bar fade out rather than leaving a hard-cut sliver. */
+.vf-home__rows {
+	-webkit-mask-image: linear-gradient(transparent 0, #000 28px);
+}
+
+/* Playlist tiles: four covers in a 2×2 mosaic, split by 2 px of ground. */
+.vf-mosaic {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: 1fr 1fr;
+	grid-gap: 2px;
+	border-radius: 14px;
+	overflow: hidden;
+	background: var(--vf-ground);
+}
+
+.vf-mosaic > img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* ---- Library views: by genre, by narrator ---------------------------------------------------- */
+
+.vf-sorts__divider {
+	width: 1px;
+	height: 32px;
+	margin: 0 12px;
+	background: #2E333D;
+}
+
+.vf-library__shelves {
+	top: 140px;
+}
+
+/* Narrators: the letter rail sits in the right margin; the current letter is brass. */
+.vf-letters {
+	position: absolute;
+	right: 10px;
+	top: 160px;
+	width: 48px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	font-size: 20px;
+	color: var(--vf-faint);
+}
+
+.vf-letters > li {
+	width: 40px;
+	height: 34px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 17px;
+}
+
+.vf-letters > li.is-current {
+	background: var(--vf-brass);
+	color: var(--vf-ground);
+	font-weight: 700;
+}
+
+/* Library header: the title and view tabs on one line; Filter and Sort on a quieter line below (Books
+   only). Chips keep to one line with their full padding. */
+.vf-library .vf-sort {
+	white-space: nowrap;
+	flex: none;
+	padding-left: 24px;
+	padding-right: 24px;
+}
+
+.vf-library__tools {
+	position: absolute;
+	left: 186px;
+	top: 138px;
+}
+
+.vf-library__tools .vf-sorts__label--gap {
+	margin-left: 28px;
+}
+
+/* Books view: the grid starts below the tools line. */
+.vf-library--all .vf-grid,
+.vf-library--all .vf-browse__message {
+	top: 206px;
+}
+
+.vf-letters > li.vf-letters__hint {
+	width: auto;
+	margin-top: 10px;
+	font-size: 20px;
+	color: var(--vf-muted);
+	white-space: nowrap;
+}

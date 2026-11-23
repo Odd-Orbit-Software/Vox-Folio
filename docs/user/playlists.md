@@ -6,9 +6,9 @@ nav_order: 4
 
 # Playlists
 
-Playlists come from Audiobookshelf. Make them in the Audiobookshelf web app. Book playlists are under **Library → Collections**, and podcast playlists are on the **Podcasts** tab.
+Playlists come from Audiobookshelf. Make them in the Audiobookshelf web app. Book playlists are under the Library's **Collections** tab, and podcast playlists are on the **Podcasts** tab.
 
-A playlist's page lists everything in order, numbered. **Play all** starts at the beginning. Once you're part way through, the button reads **Continue · <title>**, and when everything is finished, **Play again from the start**. OK on any entry plays from there.
+A playlist with four or more entries shows four of their covers on its tile. A playlist's page lists everything in order, numbered. **Green** on an entry opens its details, or the show's page for a podcast episode. **Play all** starts at the beginning. Once you're part way through, the button reads **Continue · <title>**, and when everything is finished, **Play again from the start**. OK on any entry plays from there.
 
 While a playlist plays:
 

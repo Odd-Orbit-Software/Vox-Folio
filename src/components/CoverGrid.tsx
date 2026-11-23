@@ -1,4 +1,5 @@
-import {memo, useLayoutEffect, useRef, useState} from 'react';
+import Spotlight from '@enact/spotlight';
+import {memo, useEffect, useLayoutEffect, useRef, useState} from 'react';
 
 import {Cover, Tile} from './controls';
 import {Marquee} from './marquee';
@@ -16,11 +17,26 @@ export interface GridItem {
 	badge?: string;
 	/** Round crop, for author portraits. */
 	round?: boolean;
+	/** Four covers drawn as a 2×2 mosaic in place of coverUrl (playlists). */
+	mosaic?: string[];
+}
+
+/** A tile's artwork: a 2×2 mosaic when it has four covers, else its one cover. */
+export function TileArt ({item, size}: {item: GridItem; size: number}) {
+	if (item.mosaic && item.mosaic.length >= 4) {
+		return (
+			<div className="vf-mosaic" style={{width: size + 'px', height: size + 'px'}}>
+				{item.mosaic.slice(0, 4).map((url, i) => <img key={i} src={url} alt="" />)}
+			</div>
+		);
+	}
+	return <Cover url={item.coverUrl} title={item.title} author={item.author} size={size} round={item.round} />;
 }
 
 function sameItem (a: GridItem, b: GridItem): boolean {
 	return a.key === b.key && a.coverUrl === b.coverUrl && a.title === b.title && a.subtitle === b.subtitle &&
-		a.author === b.author && a.percent === b.percent && a.finished === b.finished && a.badge === b.badge && a.round === b.round;
+		a.author === b.author && a.percent === b.percent && a.finished === b.finished && a.badge === b.badge && a.round === b.round &&
+		(a.mosaic || []).join() === (b.mosaic || []).join();
 }
 
 interface GridTileProps {
@@ -43,7 +59,7 @@ const GridTile = memo(function GridTileView ({item, index, isDefault, onFocusInd
 			onClick={() => onSelect(item)}
 		>
 			<div className={'vf-grid__cover' + (item.round ? ' vf-grid__cover--round' : '')}>
-				<Cover url={item.coverUrl} title={item.title} author={item.author} size={240} round={item.round} />
+				<TileArt item={item} size={240} />
 				{item.finished && <span className="vf-badge vf-badge--done">Finished</span>}
 				{!item.finished && item.badge && <span className="vf-badge">{item.badge}</span>}
 				{item.percent !== null && !item.finished && (
@@ -75,10 +91,12 @@ interface CoverGridProps {
 	/** Keeps scroll position across remounts (Back from a title). */
 	initialRow?: number;
 	onRowChange?: (row: number) => void;
+	/** Move to and focus the item at `index` (each new `n` is a new jump), even outside the rendered window. */
+	jumpTo?: {index: number; n: number} | null;
 }
 
 /** Six columns of square covers. Rows slide up as focus moves down (a transform, cheap on the TV). */
-export function CoverGrid ({items, onSelect, onNearEnd, initialRow = 0, onRowChange, loading = false, round = false}: CoverGridProps) {
+export function CoverGrid ({items, onSelect, onNearEnd, initialRow = 0, onRowChange, loading = false, round = false, jumpTo = null}: CoverGridProps) {
 	const [row, setRow] = useState(initialRow);
 	const rows = Math.ceil(items.length / COLUMNS);
 
@@ -90,6 +108,25 @@ export function CoverGrid ({items, onSelect, onNearEnd, initialRow = 0, onRowCha
 		}
 		if (onNearEnd && r >= rows - 2) onNearEnd();
 	};
+
+	// A jump: bring the row into the window during render (a new jump number is a changed prop), then
+	// focus the tile once it's rendered.
+	const [seenJump, setSeenJump] = useState(0);
+	if (jumpTo && jumpTo.n !== seenJump && items[jumpTo.index]) {
+		setSeenJump(jumpTo.n);
+		setRow(Math.floor(jumpTo.index / COLUMNS));
+	}
+	const jumpN = jumpTo ? jumpTo.n : 0;
+	useEffect(() => {
+		if (!jumpTo || !items[jumpTo.index]) return undefined;
+		if (onRowChange) onRowChange(Math.floor(jumpTo.index / COLUMNS));
+		const key = items[jumpTo.index].key;
+		const t = window.setTimeout(() => {
+			const el = document.querySelector('.vf-grid [data-focus-key="' + key.replace(/"/g, '\\"') + '"]') as HTMLElement | null;
+			if (el && !Spotlight.focus(el as unknown as string)) el.focus();
+		}, 0);
+		return () => window.clearTimeout(t);
+	}, [jumpN]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Stable callbacks for the memoised tiles; they always call the latest handlers.
 	const latest = useRef({onFocusIndex, onSelect});

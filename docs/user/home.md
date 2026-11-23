@@ -24,6 +24,8 @@ Below it are rows you can choose and order yourself:
 
 **Choose Home rows** at the bottom of Home opens the settings for this. Each row can be shown or hidden, and Channel up and down move the focused row. See [Settings](settings).
 
+Once you scroll down past the main card, its book stays at the top of the screen as a small **▶ title · N%** button, so it's one press of Up away.
+
 ## Taking something off Continue listening
 
 To take an item off Home without finishing it, press **Red** on its tile in In progress, or choose **Remove** on the main card. For a few seconds after, Red puts it back. Listening to it again brings it back too.

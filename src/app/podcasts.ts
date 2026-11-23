@@ -63,7 +63,7 @@ export function episodeState (e: PodcastEpisode, progress: Record<string, MediaP
 	const started = p.currentTime > 0;
 	return {
 		finished: false,
-		percent: started ? Math.max(1, Math.round((p.progress || (duration ? p.currentTime / duration : 0)) * 100)) : 0,
+		percent: started ? Math.max(1, Math.floor((p.progress || (duration ? p.currentTime / duration : 0)) * 100)) : 0,
 		left: started && duration ? Math.max(0, duration - p.currentTime) : null
 	};
 }

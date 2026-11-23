@@ -72,8 +72,11 @@ export function playlistTile (client: AbsClient, pl: Playlist): GridItem {
 	const first = items[0];
 	const episodes = items.filter((i) => i.episodeId).length;
 	const noun = episodes === items.length ? (items.length === 1 ? ' episode' : ' episodes') : (items.length === 1 ? ' item' : ' items');
+	// Four or more entries: their first four distinct covers (episodes of one show share one).
+	const ids = items.map((i) => i.libraryItemId).filter((id, i, all) => all.indexOf(id) === i);
 	return {
 		key: 'playlist:' + pl.id,
+		mosaic: ids.length >= 4 ? ids.slice(0, 4).map((id) => client.coverUrl(id, 240)) : undefined,
 		coverUrl: first ? client.coverUrl(first.libraryItemId, 480) : '',
 		title: pl.name,
 		subtitle: 'Playlist · ' + items.length + noun,

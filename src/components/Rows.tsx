@@ -4,8 +4,9 @@ import type {FocusEvent, KeyboardEvent, ReactNode} from 'react';
 
 import {Keys} from '../platform/webos';
 
-import {Cover, Icon, Tile} from './controls';
+import {Icon, Tile} from './controls';
 import {Marquee} from './marquee';
+import {TileArt} from './CoverGrid';
 import type {GridItem} from './CoverGrid';
 import {pinScroll} from './ScreenContainer';
 
@@ -87,7 +88,7 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus, action}: 
 							}}
 						>
 							<div className={'vf-grid__cover' + (item.round ? ' vf-grid__cover--round' : '')}>
-								<Cover url={item.coverUrl} title={item.title} author={item.author} size={240} round={item.round} />
+								<TileArt item={item} size={240} />
 								{item.finished && <span className="vf-badge vf-badge--done">Finished</span>}
 								{!item.finished && item.badge && <span className="vf-badge">{item.badge}</span>}
 								{item.percent !== null && !item.finished && (
@@ -105,13 +106,16 @@ export function CoverRow ({title, items, onSelect, meta, defaultFocus, action}: 
 }
 
 /** A vertical stack of rows (data-vrow) that scrolls so the focused row sits near the top. */
-export function VScroll ({className = '', children}: {className?: string; children: ReactNode}) {
+export function VScroll ({className = '', onScrolled, children}: {className?: string; onScrolled?: (scrolled: boolean) => void; children: ReactNode}) {
 	const [offset, setOffset] = useState(0);
 	const onFocus = (ev: FocusEvent<HTMLDivElement>) => {
 		const row = (ev.target as HTMLElement).closest('[data-vrow]') as HTMLElement | null;
 		if (!row) return;
 		const top = row.offsetTop;
-		setOffset(top < 200 ? 0 : top - 40);
+		// The focused row sits at the top; the row before it goes fully out of view, not left as a sliver.
+		const next = top < 200 ? 0 : top - 16;
+		setOffset(next);
+		if (onScrolled) onScrolled(next > 0);
 	};
 	// Up/Down always go to the adjacent row (to its closest item), never skipping a short row the way
 	// Spotlight's nearest-element search can. At the first or last row the key goes on as usual.

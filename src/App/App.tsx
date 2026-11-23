@@ -823,6 +823,7 @@ function App () {
 					onSettings={onSettings}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 					onOpenCollections={(libraryId) => go({name: 'collections', libraryId}, 'collections')}
+					onOpenNarrator={(libraryId, name, fromKey) => go({name: 'books', title: name, source: {kind: 'narrator', libraryId, name}}, fromKey)}
 				/>
 			)}
 			{route.name === 'search' && client && (
@@ -898,6 +899,7 @@ function App () {
 					restoreKey={top.focusKey}
 					onOpenTitle={(itemId, fromKey) => go({name: 'details', itemId}, fromKey)}
 					onPlayQueue={playQueue}
+					onOpenShow={(itemId, showTitle, fromKey) => go({name: 'podcast', itemId, title: showTitle}, fromKey)}
 				/>
 			)}
 			{route.name === 'series' && client && (

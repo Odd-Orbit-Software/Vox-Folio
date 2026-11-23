@@ -378,6 +378,34 @@ The user is using the TV: **ask before any TV test**, and batch the tests so you
   - `scratchpad/c2run.sh` now checks which profile is focused first.
 - **Plaintext tokens on the TV.** WAM's leveldb data files hold none (compacted at 13:09). The two MANIFEST matches belong to Crunchyroll. Nothing to clean.
 
+## Batch 5 (agreed 2026-11-23): build the mockups
+
+TV testing is allowed without asking for this round. The mockups are at https://claude.ai/artifact/4t9wDBgo5QmDibBJA5oNPS. Each item: build, test on the TV, run the impeccable review, fix, update the docs, then commit. The plan is one bump, 0.12.0.
+
+| # | Item | Status |
+| --- | --- | --- |
+| D | Home: the main card scrolls fully away, a fade sits under the title, and the main card's book becomes a top-bar chip once scrolled (when nothing is loaded) | done (0.12.0) |
+| C | Playlists: a 4-cover mosaic tile for 4 or more entries; Green on a playlist entry opens Details, with the hint shown while focused | done (0.12.0) |
+| A | Library "View": All books / By genre (a shelf per genre, OK on the heading for all) | done (0.12.0) |
+| B | Library "View": By narrator (a grid of portraits with an A–Z rail; CH +/− for the next letter; OK opens their books) | done (0.12.0) |
+
+The Homebrew Channel is to be revisited after this (licence decision pending).
+
+### Batch 5 notes
+- **Library header** (the user's feedback that it was too busy): tabs Books / Genres / Narrators / Collections on the title line. Filter and Sort sit on a second line (`.vf-library__tools`, Books only), and the grid starts at 206 px. Chips are nowrap.
+- **Genres:** `LibraryViews.tsx` `genreShelves` builds the shelves in one pass. Shelves are windowed at ±3; SHELF_HEIGHT is 418 and drifts under Large text (a known follow-up).
+- **Narrators:** `CoverGrid jumpTo` sets the row during render. There's a letter rail with a "CH ±" caption.
+- **Back:** restores focus to the same place, using `wholeCache`, the module cache of all items and filter data per library.
+- **Playlists:** `TileArt` mosaic; Green opens Details or the show.
+- **Home:** `VScroll` scrolls to top − 16 with a top mask, and the continue chip appears once scrolled.
+- **Percentages:** floored everywhere.
+- **Review fixes applied:** Back restore, memoised lists, rail caption, empty and error states, the "details or show" hint wording.
+- **Not done:**
+  - "All N" Back returning to the shelf
+  - surname sort
+  - "&"-joined narrators
+- **TV-verified on claude-test-2:** Weekend queue now has 4 entries (Heaven's River added for the mosaic test).
+
 ## Log
 
 - 2026-11-22: The user asked to centre the round profile avatars' initials vertically (Newsreader caps sit high). Fixed in 0.8.1.

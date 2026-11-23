@@ -80,7 +80,7 @@ export default function SeriesDetail ({client, libraryId, seriesId, seriesName, 
 					{entries.map((e, i) => {
 						const p = progress[e.item.id];
 						const done = Boolean(p && p.isFinished);
-						const pct = p && !done ? Math.round(p.progress * 100) : 0;
+						const pct = p && !done ? Math.floor(p.progress * 100) : 0;
 						const md = e.item.media.metadata;
 						const chapters = e.item.media.numChapters;
 						return (

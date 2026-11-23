@@ -162,7 +162,7 @@ export default function PodcastShow ({client, itemId, title, player, restoreKey,
 					{ready && episodes.map((e, i) => {
 						const s = episodeState(e, ready.progress);
 						const playing = player.itemId === itemId && player.episodeId === e.id && player.status !== 'error';
-						const pct = playing && player.duration ? Math.round(player.position / player.duration * 100) : s.percent;
+						const pct = playing && player.duration ? Math.floor(player.position / player.duration * 100) : s.percent;
 						const [day, monthYear] = dateParts(e.publishedAt);
 						const key = 'ep:' + itemId + '/' + e.id;
 						return (

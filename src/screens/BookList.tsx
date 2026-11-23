@@ -12,6 +12,7 @@ import {ErrorPanel} from '../components/ErrorPanel';
 import {ScreenContainer} from '../components/ScreenContainer';
 import {toGridItem} from './Library';
 import {episodeTile} from './Podcasts';
+import {Keys} from '../platform/webos';
 
 interface BookListProps {
 	client: AbsClient;
@@ -21,6 +22,8 @@ interface BookListProps {
 	onOpenTitle: (itemId: string, fromKey: string) => void;
 	/** Play a playlist in order, starting at one of its entries. */
 	onPlayQueue: (queue: Queue, startKey: string, fromKey: string) => void;
+	/** Green on a podcast episode in a playlist: its show's page. */
+	onOpenShow: (itemId: string, title: string, fromKey: string) => void;
 }
 
 interface Loaded {
@@ -45,7 +48,7 @@ function countLabel (n: number, episodes: boolean, mixed: boolean): string {
 
 /** A plain grid of books: a narrator's work or a collection. A playlist also plays in order: OK on an
     entry plays from there, and Play goes from the first one not yet finished. */
-export default function BookList ({client, title, source, restoreKey, onOpenTitle, onPlayQueue}: BookListProps) {
+export default function BookList ({client, title, source, restoreKey, onOpenTitle, onPlayQueue, onOpenShow}: BookListProps) {
 	const [data, setData] = useState<Loaded | null>(null);
 	const [error, setError] = useState<AbsError | null>(null);
 	const [reload, setReload] = useState(0);
@@ -64,6 +67,25 @@ export default function BookList ({client, title, source, restoreKey, onOpenTitl
 	}, [client, source, reload]);
 
 	const queue = data && data.playlist ? queueFromPlaylist(data.playlist) : null;
+
+	// In a playlist OK plays; Green opens the focused entry's Details (a book) or its show (an episode).
+	useEffect(() => {
+		if (!queue) return undefined;
+		const onKey = (ev: KeyboardEvent) => {
+			if (ev.keyCode !== Keys.GREEN) return;
+			const el = document.activeElement as HTMLElement | null;
+			const key = el && el.getAttribute('data-focus-key');
+			if (!key || key.indexOf('q:') !== 0) return;
+			const entry = queue.entries.filter((e) => e.key === key.slice(2))[0];
+			if (!entry) return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			if (entry.episodeId) onOpenShow(entry.itemId, entry.author, key);
+			else onOpenTitle(entry.itemId, key);
+		};
+		window.addEventListener('keydown', onKey, true);
+		return () => window.removeEventListener('keydown', onKey, true);
+	}, [queue, onOpenShow, onOpenTitle]);
 	const progress = data ? data.progress : {};
 	let items: GridItem[] = [];
 	if (queue && data && data.playlist) {
@@ -103,7 +125,7 @@ export default function BookList ({client, title, source, restoreKey, onOpenTitl
 						<Button variant="primary" className="vf-list__play" data-default-focus data-focus-key="play-all" onClick={() => onPlayQueue({...queue, replay: start.replay}, start.entry.key, 'play-all')}>
 							<Icon name="play" size={26} /><span className="vf-list__playlabel">{playLabel}</span>
 						</Button>
-						<span className="vf-muted vf-list__note">Plays in order · press OK on any entry to play from there</span>
+						<span className="vf-muted vf-list__note">Plays in order · OK on an entry plays from there · <span className="vf-dot vf-dot--green" />Green: details or show</span>
 					</div>
 				)}
 			</header>

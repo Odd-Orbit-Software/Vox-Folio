@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent} from 'react';
 
 import {AbsClient, AbsError} from '../abs/client';
@@ -11,6 +11,7 @@ import {CoverGrid} from '../components/CoverGrid';
 import type {GridItem} from '../components/CoverGrid';
 import {Button, Icon} from '../components/controls';
 import {FilterPanel} from '../components/FilterPanel';
+import {GenreView, genreShelves, NarratorView, narrators} from '../components/LibraryViews';
 import {Rail} from '../components/Rail';
 import {ErrorPanel} from '../components/ErrorPanel';
 import {focusWithin, ScreenContainer} from '../components/ScreenContainer';
@@ -52,6 +53,32 @@ function setLibsCache (libs: LibraryInfo[]): void {
 	libsCache = libs;
 }
 
+type ViewId = 'all' | 'genres' | 'narrators';
+const VIEWS: {id: ViewId; label: string}[] = [
+	{id: 'all', label: 'Books'},
+	{id: 'genres', label: 'Genres'},
+	{id: 'narrators', label: 'Narrators'}
+];
+/** The chosen view, kept while the app runs (written only through rememberView, outside the component). */
+let viewCache: ViewId = 'all';
+
+function rememberView (v: ViewId): void {
+	viewCache = v;
+}
+
+/* The whole library (for filter counts and the genre and narrator views) and its filter data, kept per
+   library while the app runs, so Back from a narrator or a book returns at once to the same place. */
+let wholeCache: {libraryId: string; items: LibraryItem[] | null; data: FilterData | null} | null = null;
+
+function rememberWhole (libraryId: string, patch: {items?: LibraryItem[] | null; data?: FilterData | null}): void {
+	const base = wholeCache && wholeCache.libraryId === libraryId ? wholeCache : {libraryId, items: null, data: null};
+	wholeCache = {...base, ...patch};
+}
+
+function wholeFor (libraryId: string | null): {items: LibraryItem[] | null; data: FilterData | null} {
+	return wholeCache && libraryId && wholeCache.libraryId === libraryId ? wholeCache : {items: null, data: null};
+}
+
 interface LibraryProps {
 	client: AbsClient;
 	restoreKey: string | null;
@@ -59,6 +86,7 @@ interface LibraryProps {
 	onSettings: () => void;
 	onOpenTitle: (itemId: string, fromKey: string) => void;
 	onOpenCollections: (libraryId: string) => void;
+	onOpenNarrator: (libraryId: string, name: string, fromKey: string) => void;
 }
 
 /** Sort merged results the way the server would for the chosen sort. */
@@ -83,20 +111,27 @@ export function toGridItem (client: AbsClient, item: LibraryItem, progress: Medi
 		subtitle: started && item.media.duration
 			? formatDuration(Math.max(0, item.media.duration - progress!.currentTime)) + ' left'
 			: md.authorName || '',
-		percent: started ? Math.round(progress!.progress * 100) : null,
+		percent: started ? Math.floor(progress!.progress * 100) : null,
 		finished: Boolean(progress && progress.isFinished)
 	};
 }
 
-export default function Library ({client, restoreKey, onTab, onSettings, onOpenTitle, onOpenCollections}: LibraryProps) {
+export default function Library ({client, restoreKey, onTab, onSettings, onOpenTitle, onOpenCollections, onOpenNarrator}: LibraryProps) {
 	const [libraries, setLibraries] = useState<LibraryInfo[] | null>(libsCache);
 	const [libraryId, setLibraryId] = useState<string | null>(cache ? cache.libraryId : null);
 	const [sort, setSort] = useState<SortId>(cache ? cache.sort : 'recent');
 	const [filters, setFilters] = useState<Filters>(cache ? cache.filters : NO_FILTERS);
 	// Every book, for the filter panel's counts (loaded when the panel opens, small libraries only).
-	const [allItems, setAllItems] = useState<LibraryItem[] | null>(null);
-	const [filterData, setFilterData] = useState<FilterData | null>(null);
+	const startLibrary = cache ? cache.libraryId : null;
+	const [allItems, setAllItemsState] = useState<LibraryItem[] | null>(() => wholeFor(startLibrary).items);
+	const [filterData, setFilterDataState] = useState<FilterData | null>(() => wholeFor(startLibrary).data);
+	const [wholeError, setWholeError] = useState(false);
 	const [filterOpen, setFilterOpen] = useState(false);
+	const [view, setViewState] = useState<ViewId>(viewCache);
+	const setView = (v: ViewId) => {
+		rememberView(v);
+		setViewState(v);
+	};
 	const [items, setItems] = useState<LibraryItem[]>(cache ? cache.items : []);
 	const [total, setTotal] = useState(cache ? cache.total : -1);
 	const [progress, setProgress] = useState<Record<string, MediaProgress>>({});
@@ -212,12 +247,15 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		if (!libraryId || filterData) return undefined;
 		let cancelled = false;
 		client.filterData(libraryId).then((d) => {
-			if (!cancelled) setFilterData(d);
-		}, () => undefined);
+			rememberWhole(libraryId, {data: d});
+			if (!cancelled) setFilterDataState(d);
+		}, () => {
+			if (!cancelled) setWholeError(true);
+		});
 		return () => {
 			cancelled = true;
 		};
-	}, [client, libraryId, filterData]);
+	}, [client, libraryId, filterData, reload]);
 
 	// Closing without a change puts focus back on the Filter chip.
 	const closeFilter = useCallback(() => {
@@ -237,15 +275,18 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 	// Counts in the filter panel need every book: fetched once per library when the panel opens, and
 	// only for libraries small enough to hold in memory on a TV.
 	useEffect(() => {
-		if (!filterOpen || allItems || !libraryId || !filterData || (filterData.bookCount || 0) > 2000) return undefined;
+		if ((!filterOpen && view === 'all') || allItems || !libraryId || !filterData || (filterData.bookCount || 0) > 2000) return undefined;
 		let cancelled = false;
 		client.libraryItems(libraryId, {sort: 'media.metadata.title', page: 0, limit: 2000}).then((res) => {
-			if (!cancelled) setAllItems(res.results);
-		}, () => undefined);
+			rememberWhole(libraryId, {items: res.results});
+			if (!cancelled) setAllItemsState(res.results);
+		}, () => {
+			if (!cancelled) setWholeError(true);
+		});
 		return () => {
 			cancelled = true;
 		};
-	}, [client, filterOpen, allItems, libraryId, filterData]);
+	}, [client, filterOpen, view, allItems, libraryId, filterData]);
 
 	const nextLibrary = () => {
 		if (!libraries || libraries.length < 2 || !libraryId) return;
@@ -257,16 +298,20 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 		setTotal(-1);
 		// Another library has its own genres and narrators.
 		setFilters(NO_FILTERS);
-		setFilterData(null);
-		setAllItems(null);
+		setFilterDataState(null);
+		setAllItemsState(null);
 		setLibraryId(next.id);
 	};
+
+	// Built once per library load, not on every render.
+	const shelves = useMemo(() => (allItems ? genreShelves(allItems, filterData) : []), [allItems, filterData]);
+	const readers = useMemo(() => (allItems ? narrators(allItems) : []), [allItems]);
 
 	const current = libraries && libraryId ? libraries.filter((l) => l.id === libraryId)[0] : null;
 	const grid = items.map((item) => toGridItem(client, item, progress[item.id]));
 
 	return (
-		<ScreenContainer id="library" className="vf-browse" restoreKey={restoreKey} focusDeps={[items.length > 0, error]}>
+		<ScreenContainer id="library" className={'vf-browse vf-library vf-library--' + view} restoreKey={restoreKey} focusDeps={[items.length > 0, error, view, allItems !== null]}>
 			<Rail active="library" onTab={onTab} onSettings={onSettings} />
 			<header className="vf-browse__head">
 				<div className="vf-browse__title">
@@ -277,18 +322,37 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 					) : (
 						<h1 className="vf-browse__h1">{current ? current.name : 'Library'}</h1>
 					)}
-					{total >= 0 && (
+					{view === 'genres' && allItems && <span className="vf-muted vf-browse__count">{shelves.length + ' genres'}</span>}
+					{view === 'narrators' && allItems && <span className="vf-muted vf-browse__count">{readers.length + ' narrators'}</span>}
+					{view === 'all' && total >= 0 && (
 						<span className="vf-muted vf-browse__count">
 							{hasFilters(filters) && filterData && filterData.bookCount ? total + ' of ' + filterData.bookCount + ' titles' : total + (total === 1 ? ' title' : ' titles')}
 						</span>
 					)}
 				</div>
-				<div className="vf-sorts" role="group" aria-label="Sort">
+				<div className="vf-sorts vf-views" role="tablist" aria-label="View">
+					{VIEWS.map((v) => (
+						<Button
+							key={v.id}
+							variant="chip"
+							role="tab"
+							className={'vf-sort' + (v.id === view ? ' is-selected' : '')}
+							aria-selected={v.id === view}
+							data-focus-key={'view:' + v.id}
+							onClick={() => setView(v.id)}
+						>
+							{v.label}
+						</Button>
+					))}
 					{lists > 0 && libraryId && (
-						<Button variant="chip" className="vf-sorts__lists" data-focus-key="collections" onClick={() => onOpenCollections(libraryId)}>
+						<Button variant="chip" className="vf-sort" data-focus-key="collections" onClick={() => onOpenCollections(libraryId)}>
 							{'Collections · ' + lists}
 						</Button>
 					)}
+				</div>
+			</header>
+			{view === 'all' && (
+				<div className="vf-sorts vf-library__tools" role="group" aria-label="Filter and sort">
 					<Button
 						variant="chip"
 						className={'vf-sort vf-filterchip' + (hasFilters(filters) ? ' is-active' : '')}
@@ -318,9 +382,39 @@ export default function Library ({client, restoreKey, onTab, onSettings, onOpenT
 						</Button>
 					))}
 				</div>
-			</header>
+			)}
 
-			{error ? (
+			{view !== 'all' && !error ? (
+				wholeError && !allItems ? (
+					<ErrorPanel error={new AbsError('network', 'Could not load the library.')} onRetry={() => {
+						setWholeError(false);
+						setReload((n) => n + 1);
+					}}
+					/>
+				) : !allItems ? (
+					filterData && (filterData.bookCount || 0) > 2000
+						? <p className="vf-message__body vf-browse__message">This library is too large to group on the TV. Use Filter in Books instead.</p>
+						: <CoverGrid items={[]} loading round={view === 'narrators'} onSelect={() => undefined} />
+				) : view === 'genres' && !shelves.length ? (
+					<p className="vf-message__body vf-browse__message">No genres are tagged in this library.</p>
+				) : view === 'narrators' && !readers.length ? (
+					<p className="vf-message__body vf-browse__message">No narrators are listed in this library.</p>
+				) : view === 'genres' ? (
+					<GenreView
+						client={client}
+						shelves={shelves}
+						restoreKey={restoreKey}
+						toTile={(b) => toGridItem(client, b, progress[b.id])}
+						onOpenTitle={onOpenTitle}
+						onOpenGenre={(g) => {
+							setView('all');
+							chooseFilters({progress: null, meta: {group: 'genres', value: g.value, sources: g.sources}});
+						}}
+					/>
+				) : (
+					<NarratorView list={readers} restoreKey={restoreKey} onOpenNarrator={(name, fromKey) => libraryId && onOpenNarrator(libraryId, name, fromKey)} />
+				)
+			) : error ? (
 				<ErrorPanel error={error} onRetry={() => {
 					setError(null);
 					setReload((n) => n + 1);

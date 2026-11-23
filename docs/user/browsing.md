@@ -14,6 +14,15 @@ The side rail holds Home, Search, Library, Series, Authors, Podcasts ★ and Set
 
 Every book in the library, as covers. Sort by **Recently added**, **Title** or **Author**. With more than one book library, the library name at the top switches between them.
 
+The tabs at the top right switch how the library is laid out:
+
+- **Books:** every book. Filter and Sort sit on the line below the title.
+- **Genres:** a shelf for each genre, the biggest first. The last tile on a long shelf, **All N**, opens every book in that genre.
+- **Narrators:** everyone who reads in the library, as portraits from A to Z. Channel up and down jump to the next or previous letter, shown on the right. OK opens their books.
+- **Collections:** the server's collections and playlists, when there are any.
+
+The genre and narrator views work for libraries of up to 2,000 books.
+
 **Filter** narrows the list by a progress state, by one genre, narrator, tag or language, or by one of each together:
 
 - **Progress:** not started, in progress or finished
@@ -23,7 +32,7 @@ Each choice shows how many books it would return. Choices stay in the panel as y
 
 Genres that a metadata source joined into one long string are split into separate genres, and different spellings of a language are merged. While a filter is on, the chip shows it and the count reads, for example, "7 of 181 titles". **Red** on the chip, or in the filter panel, shows all books again. In long lists such as narrators, Channel up and down jump eight at a time.
 
-**Collections** appears beside the sort options when your server has collections or playlists.
+Back from a book or a narrator returns to the same place in the view.
 
 ## A book's page
 

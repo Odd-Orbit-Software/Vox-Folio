@@ -142,12 +142,15 @@ function remaining (e: Entry): string {
 }
 
 function percent (e: Entry): number {
-	return e.progress ? Math.round(e.progress.progress * 100) : 0;
+	// Rounded down everywhere, as the player shows it, so one book never shows two percentages.
+	return e.progress ? Math.floor(e.progress.progress * 100) : 0;
 }
 
 export default function Home ({client, player, restoreKey, onPlay, onDetails, onPlayEpisode, onOpenShow, onShowPlayer, onTab, onSettings, onToast, onOpenSeries, onCustomise, yearPrompt, onOpenYear}: HomeProps) {
 	const [cached] = useState(() => readCache(client));
 	const settings = useSettings();
+	// Once the main card has scrolled away, its book stays one press away as a chip in the top bar.
+	const [scrolled, setScrolled] = useState(false);
 	// "Not now" hides the Year in Review prompt straight away.
 	const [promptYear, setPromptYear] = useState(yearPrompt);
 	const [load, setLoad] = useState<Load>(() => (cached && cached.entries.length
@@ -447,11 +450,24 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 					{stale && load.state === 'ready' && (
 						<Button variant="chip" className="vf-offline" data-focus-key="offline" onClick={retry}>{errorTitle(stale) + ' · Retry'}</Button>
 					)}
+					{!nowPlaying && scrolled && hero && (
+						<Button
+							variant="chip"
+							className="vf-nowplaying"
+							data-focus-key="continue-chip"
+							onKeyDown={downFromTop}
+							onClick={() => (heroEp ? onPlayEpisode(hero.item.id, heroEp.id, 'continue-chip') : onPlay(hero.item.id, 'continue-chip'))}
+						>
+							<Icon name="play" size={18} />
+							<span className="vf-nowplaying__title">{heroEp ? episodeTitle(heroEp) : hero.item.media.metadata.title}</span>
+							<span className="vf-muted vf-nowplaying__pct">{'· ' + percent(hero) + '%'}</span>
+						</Button>
+					)}
 					{nowPlaying && (
 						<Button variant="chip" className="vf-nowplaying" onClick={() => onShowPlayer('now-playing')} onKeyDown={downFromTop} data-focus-key="now-playing">
 							<Icon name={nowPlaying.status === 'playing' ? 'pause' : 'play'} size={18} />
 							<span className="vf-nowplaying__title">{nowPlaying.title || 'Loading…'}</span>
-							{nowPlaying.duration > 0 && <span className="vf-muted vf-nowplaying__pct">{'· ' + Math.round(nowPlaying.position / nowPlaying.duration * 100) + '%'}</span>}
+							{nowPlaying.duration > 0 && <span className="vf-muted vf-nowplaying__pct">{'· ' + Math.floor(nowPlaying.position / nowPlaying.duration * 100) + '%'}</span>}
 						</Button>
 					)}
 				</div>
@@ -471,7 +487,7 @@ export default function Home ({client, player, restoreKey, onPlay, onDetails, on
 			{load.state === 'error' && <ErrorPanel error={load.error} onRetry={retry} className="vf-errorpanel--home" />}
 
 			<div onFocus={rememberRow}>
-			<VScroll className="vf-home__rows">
+			<VScroll className="vf-home__rows" onScrolled={setScrolled}>
 				{load.state === 'ready' && !hero && (
 					<div className="vf-message vf-home__empty" data-vrow>
 						<h1 className="vf-message__title">Nothing in progress yet</h1>

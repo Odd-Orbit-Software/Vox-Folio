@@ -41,6 +41,8 @@ Pointing at anything focuses it, and OK or a click chooses it. The wheel moves u
 | A podcast's episodes | Red | Mark played or unplayed |
 | Library filter | Red | Show all books again |
 | Library filter, long lists | Left / Right | Jump to the previous or next letter |
+| Library, by narrator | Channel + / − | Next or previous letter |
+| A playlist | Green | The focused entry's details (or the show, for an episode) |
 | Chapters, playlists, filter lists | Channel + / − | Jump eight at a time |
 | Settings, Home rows | Channel + / − | Move a row up or down |
 | Settings, rows with a range | Left / Right | Step the value down or up |
