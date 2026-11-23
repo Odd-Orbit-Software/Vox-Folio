@@ -2,6 +2,7 @@ import {useEffect, useState, useSyncExternalStore} from 'react';
 
 import {AbsClient, AbsError, serverStatus, tokenExpiry} from '../abs/client';
 import {deviceId} from '../abs/store';
+import {vaultMode} from '../platform/vault';
 import {getLiveStatus, subscribeLiveStatus} from '../app/live';
 import {Button} from '../components/controls';
 import {errorTitle} from '../components/ErrorPanel';
@@ -98,6 +99,10 @@ export default function Diagnostics ({client, version, onDone, onToast}: Diagnos
 				</dd>
 				<dt>Signed in as</dt>
 				<dd>{creds.username}</dd>
+				<dt>Saved sign-ins</dt>
+				<dd className={vaultMode() === 'encrypted' ? '' : 'vf-diag__bad'}>
+					{vaultMode() === 'encrypted' ? 'Encrypted on this TV' : 'Not encrypted: this TV lacks Web Crypto'}
+				</dd>
 				<dt>Saved Home</dt>
 				<dd>{cache.count ? 'Ready: Home opens instantly' : 'None yet'}</dd>
 			</dl>

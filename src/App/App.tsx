@@ -39,6 +39,7 @@ import Authors from '../screens/Authors';
 import BookList from '../screens/BookList';
 import Collections from '../screens/Collections';
 import {LiveSocket} from '../abs/socket';
+import {vaultFlush} from '../platform/vault';
 import {publishProgress, setLiveStatus} from '../app/live';
 import {loadQueue, nextInQueue, queueIndex, saveQueue} from '../app/queue';
 import type {Queue} from '../app/queue';
@@ -86,12 +87,9 @@ function idleTimeoutMs (): number {
 const idle = typeof window !== 'undefined' ? new IdleWatcher(idleTimeoutMs()) : (null as unknown as IdleWatcher);
 const subscribeIdle = (fn: () => void) => idle.subscribe(fn);
 
-/** Leave the app, closing the listening session first (briefly) so it's recorded. */
+/** Leave the app, closing the listening session first (briefly) so it's recorded, and letting any
+    rotated sign-in tokens finish saving to the vault. */
 function leaveApp (engine: PlayerEngine | null): void {
-	if (!engine) {
-		exitApp();
-		return;
-	}
 	let gone = false;
 	const go = () => {
 		if (!gone) {
@@ -99,7 +97,7 @@ function leaveApp (engine: PlayerEngine | null): void {
 			exitApp();
 		}
 	};
-	engine.suspend(true).then(go, go);
+	Promise.all([engine ? engine.suspend(true) : Promise.resolve(), vaultFlush()]).then(go, go);
 	window.setTimeout(go, 1500);
 }
 // Development: `yearPrompt` (with `probe`) shows Home's Year in Review prompt out of season.

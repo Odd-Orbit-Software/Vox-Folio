@@ -2,6 +2,7 @@
    Profile 1 is created from the sign-in saved before profiles existed, so nobody has to sign in again. */
 
 import type {Credentials} from '../abs/client';
+import {vaultGet, vaultSet} from '../platform/vault';
 
 export interface Profile {
 	id: string;
@@ -17,12 +18,16 @@ export interface ProfileState {
 const KEY = 'voxfolio.profiles.v1';
 const LEGACY_CREDS_KEY = 'voxfolio.credentials.v1';
 
-function storage (): Storage | null {
-	try {
-		return window.localStorage;
-	} catch {
-		return null;
-	}
+/* Profiles carry sign-in tokens, so they're kept in the encrypted vault (platform/vault.ts), which
+   falls back to plain localStorage only where the TV lacks Web Crypto. */
+const store = {
+	getItem: vaultGet,
+	setItem: (name: string, value: string) => vaultSet(name, value),
+	removeItem: (name: string) => vaultSet(name, null)
+};
+
+function storage (): typeof store | null {
+	return typeof window === 'undefined' ? null : store;
 }
 
 function newId (): string {

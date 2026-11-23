@@ -26,6 +26,8 @@ sequenceDiagram
   Note over C: the old refresh token is now invalid,<br/>so refreshes are serialised and every pair is saved
 ```
 
+Tokens are saved encrypted, in the vault described in [Problems and fixes](fixes#sign-in-tokens-were-stored-in-plain-text).
+
 Cover and audio URLs can't carry headers, so they take the token as `?token=`. `keepFresh` refreshes ahead of expiry so images keep loading, and `ensureFresh` runs when the TV wakes, because timers lag during standby.
 
 ## Endpoints used

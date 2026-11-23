@@ -2,6 +2,7 @@
    reinstalling a newer IPK over an older one, which the delivery plan checks. */
 
 import type {Credentials} from './client';
+import {vaultGet, vaultSet} from '../platform/vault';
 
 const CREDS_KEY = 'voxfolio.credentials.v1';
 const DEVICE_KEY = 'voxfolio.deviceId';
@@ -25,7 +26,7 @@ function write (key: string, value: string | null): void {
 }
 
 export function loadCredentials (): Credentials | null {
-	const raw = read(CREDS_KEY);
+	const raw = vaultGet(CREDS_KEY);
 	if (!raw) return null;
 	try {
 		const c = JSON.parse(raw) as Credentials;
@@ -36,7 +37,7 @@ export function loadCredentials (): Credentials | null {
 }
 
 export function saveCredentials (creds: Credentials | null): void {
-	write(CREDS_KEY, creds ? JSON.stringify(creds) : null);
+	vaultSet(CREDS_KEY, creds ? JSON.stringify(creds) : null);
 }
 
 /** A stable per-install ID, so Audiobookshelf lists this TV as one device across sessions. */

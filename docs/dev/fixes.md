@@ -100,6 +100,12 @@ What the TV and the server taught us, with each cause and its fix.
 
 **Fix.** Controls that use Left themselves carry `data-own-left`, and the rail leaves them alone. At the end of their range they let Left through.
 
+## Sign-in tokens were stored in plain text
+
+**Cause.** Profiles, with each account's access and refresh tokens, sat in `localStorage`, which webOS keeps as readable files on the TV.
+
+**Fix.** `src/platform/vault.ts` keeps them in one AES-256-GCM encrypted entry. The key is generated on the TV with Web Crypto, created non-extractable, and stored in the app's IndexedDB. The vault is unlocked before the app renders, so reads stay synchronous, and writes are encrypted in the background, with a flush before the app exits. Existing plaintext entries move into the vault on first launch and are then deleted. LG's Keymanager3 would keep the key in secure hardware, but it needs webOS TV 24 or later. Without Web Crypto, the vault falls back to plain storage rather than signing everyone out, and Diagnostics says so.
+
 ## No cover for the longest book in Year in Review
 
 **Cause.** `longestAudiobookFinished.id` is the book's media ID, not its library item ID, and covers are fetched by item.

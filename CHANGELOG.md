@@ -3,6 +3,10 @@
 Version numbers: a bug fix or tidy-up bumps the last number (0.2.0 → 0.2.1), a new feature bumps the
 middle one (0.2.x → 0.3.0), and a large change of technology bumps the first.
 
+## 0.10.2
+
+- **Saved sign-ins are encrypted.** Each profile's sign-in tokens are encrypted on the TV, with a key that's generated there and can't be read back out. Existing sign-ins move across on first launch, and nobody has to sign in again. Diagnostics shows whether encryption is active.
+
 ## 0.10.1
 
 - **Smaller saved copy of Home.** It now keeps only what Home shows, about 50 KB instead of 400 KB per account, which is easier on the TV's storage.

@@ -29,7 +29,7 @@ ares-install --device <your-tv> software.oddorbit.voxfolio_<version>_all.ipk
 1. Open Vox Folio. The first screen asks for your server's address, the one you'd type in a browser, for example `abs.example.com` or `http://192.168.1.20:13378`.
 2. Enter your Audiobookshelf username and password. The TV's on-screen keyboard and voice input both work.
 
-Vox Folio keeps you signed in. Your password isn't stored, only the sign-in tokens Audiobookshelf issues, and those renew on their own.
+Vox Folio keeps you signed in. Your password isn't stored, only the sign-in tokens Audiobookshelf issues. They're encrypted on the TV and renew on their own.
 
 ## Profiles ★
 

@@ -38,6 +38,6 @@ The screensaver appears when the TV would start its own. After an hour on it wit
 
 - **Listening stats ★** and **Year in review ★**: see [Stats](stats).
 - **Remote buttons**: a guide to every button. See [The remote](remote).
-- **Diagnostics**: whether your server and live updates are working, plus versions and other details for support. **Clear saved Home** drops the copy Home opens from, which refills next time.
+- **Diagnostics**: whether your server and live updates are working and whether saved sign-ins are encrypted, plus versions and other details for support. **Clear saved Home** drops the copy Home opens from, which refills next time.
 
 The **Account** column shows your server and user, with **Sign out** and **About Vox Folio**.
